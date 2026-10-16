@@ -1,0 +1,144 @@
+# Clearpath
+
+Course reviews for high school, written by the students who already took the class.
+
+Most people pick next year's schedule off hallway rumors and a one-paragraph catalog
+blurb, and find out in October that the class was nothing like what they were told.
+Clearpath replaces the rumor with structured reviews: four scores out of 10 and one
+honest yes or no, from people who finished the course.
+
+Frontend only: React + Vite + Tailwind, no backend, no server. Everything a student
+enters lives in their own browser.
+
+## Run it
+
+```bash
+npm install
+npm run dev
+```
+
+Opens on http://localhost:5190. `npm run build` produces a static `dist/` you can put
+on any host.
+
+## Hand it to someone
+
+```bash
+npm run build:share
+```
+
+Produces **`share/clearpath.html`** — one self-contained file, about 565 kB, with all
+the JS and CSS inlined. No server, no build step, no `node_modules`. Email it, AirDrop
+it, put it in Google Drive, or open it by double-clicking. `share/index.html` is the
+same file under the name a static host serves by default, so you can drag the whole
+`share/` folder onto Netlify Drop or into a GitHub Pages repo.
+
+Most of that 565 kB is the 306-course catalog text. That is the trade for a file that
+needs nothing: a judge opens it and every class is already there.
+
+The only thing it loads from the network is the Google Fonts stylesheet. Offline it
+falls back to a system sans and everything still works, including localStorage — the
+file works opened straight off the disk, not just over http.
+
+## How the app goes
+
+1. **Make a profile** — name, username, grade, color. Thirty seconds, like signing up
+   for anything else.
+2. **Add your school** — Clearpath is one app per school, because a class only means
+   something next to the other classes at the same school. Westlake is the school with
+   a catalog loaded; the others are listed so students there can ask for theirs.
+3. **Open the school** — all 306 Westlake courses, searchable, filterable by
+   department, level and grade, sortable by most reviewed, most recommended, lightest
+   load or hardest.
+4. **Open a class** — the share of students who would take it again, the four scores,
+   what students tag it, the prerequisites, and the school's own course description.
+5. **Review a class** — four taps, one yes or no, and out. Everything else is optional.
+6. **Compare two classes** — side by side on the things that actually decide it, with
+   one plain sentence summing up the trade.
+
+## What a review measures
+
+Four scores out of 10 and one yes/no, defined in `src/lib/metrics.js`:
+
+| Score | The question |
+| --- | --- |
+| Difficulty | How hard was it to earn an A? |
+| Homework load | How much work outside of class? |
+| Fun | Did you enjoy being in this class? |
+| Worth it | How much did you get out of it? |
+| Would you take it again? | Yes / No — the headline number on every class |
+
+Optional: hours a week, grade you were in, year you took it, what the class was like
+(fast pace, test heavy, lots of projects…), and a note.
+
+## Product rules baked into the code
+
+These are deliberate, not oversights:
+
+- **No teacher ratings, no teacher names.** Clearpath rates the course and the shape of
+  the work, never the person teaching it. There is no field for it anywhere, and the
+  review form says so out loud.
+- **Anonymous by default.** A review posts as Anonymous unless the student turns on
+  "post with my name" for that review.
+- **No thin averages.** `MIN_REVIEWS` in `src/lib/metrics.js` is 3. Under that, a class
+  shows its catalog description and review text instead of numbers — in the grid, on the
+  class page and in Compare. Two opinions is not a pattern.
+- **One color language.** Cool means light or good, warm means heavy or watch out.
+  `toneFor()` flips the input for the two "benefit" scores, so a high Fun reads cool and
+  a low Fun reads hot. Learn it once, read it everywhere.
+- **Nothing invented.** The nine courses the catalog lists without publishing a
+  description say exactly that on the page.
+
+## What's in here
+
+```
+src/
+  data/courses.js        <- the Westlake catalog: 306 courses, generated, do not hand-edit
+  data/schools.js        <- schools you can add
+  data/sampleReviews.js  <- the labelled example reviews behind the demo switch
+  lib/metrics.js         <- the four scores, their bands, the color ramp, the tags
+  lib/stats.js           <- averages, take-again share, tag counts, how split a class is
+  lib/store.js           <- every read and write goes through here
+  components/            <- one file per screen, shared pieces in Bits.jsx
+scripts/catalog/         <- how src/data/courses.js gets rebuilt from the school's site
+```
+
+### The catalog
+
+`src/data/courses.js` comes from the published
+[WHS course catalog](https://whs.eanesisd.net/coursecatalog/courses), pulled October
+2026. Every course the school lists is in it with its real prerequisites, credit, grade
+range and description. See `scripts/catalog/README.md` to regenerate it.
+
+### Sample reviews
+
+The app ships with **zero** reviews, because a review site that writes its own reviews
+is worthless. That also makes it impossible to show anyone, so Profile → **Show sample
+reviews** fills 31 classes with clearly labelled examples. Every one carries a Sample
+chip, and a banner stays up the whole time it is on. Turn it off before collecting real
+reviews.
+
+### Swapping in a real backend
+
+Components never touch data directly. They call `src/lib/store.js`:
+
+```js
+getProfile()      saveProfile(p)
+getMySchools()    addSchool(id)       setActiveSchool(id)
+getCourses()      getCourse(id)
+getReviews(id)    getStats(id)        getStatsByCourse()
+addReview(input)  deleteReview(id)    subscribe(fn)
+```
+
+Replace those function bodies with `fetch()` calls and nothing in `components/` changes.
+
+## Before a demo
+
+Reviews you write while testing stay in localStorage. To clear everything, use
+Profile → "Start over on this device", or run in the console:
+
+```js
+Object.keys(localStorage).filter(k => k.startsWith('clearpath.')).forEach(k => localStorage.removeItem(k)); location.reload()
+```
+
+Clearpath is a student project. It is not affiliated with Eanes ISD or Westlake High
+School; the catalog text is the school's, quoted with a link to the source.
