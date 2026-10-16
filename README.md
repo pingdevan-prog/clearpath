@@ -10,6 +10,21 @@ honest yes or no, from people who finished the course.
 Frontend only: React + Vite + Tailwind, no backend, no server. Everything a student
 enters lives in their own browser.
 
+## Live site
+
+**https://pingdevan-prog.github.io/clearpath/**
+
+Served by GitHub Pages out of `docs/index.html`, which is the whole app inlined into
+one file. To update the live site:
+
+```bash
+npm run build:share
+git add docs && git commit -m "rebuild site" && git push
+```
+
+`build:share` writes `share/clearpath.html` (the file to email or AirDrop) and copies the
+same build into `docs/`, so the deployed site never drifts from the code.
+
 ## Run it
 
 ```bash
