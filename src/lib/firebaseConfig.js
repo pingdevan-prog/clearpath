@@ -15,12 +15,12 @@
 // ---------------------------------------------------------------------------
 
 export const firebaseConfig = {
-  apiKey: '',
-  authDomain: '',
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: '',
+  apiKey: 'AIzaSyAio0qtNGuDF-cNbirl-BfCSxiQIqsipmU',
+  authDomain: 'clearpath-96f1c.firebaseapp.com',
+  projectId: 'clearpath-96f1c',
+  storageBucket: 'clearpath-96f1c.firebasestorage.app',
+  messagingSenderId: '372672134877',
+  appId: '1:372672134877:web:c4ec11f9fdbe11900de534',
 }
 
 /** True once the config above is filled in. */

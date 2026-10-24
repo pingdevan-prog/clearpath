@@ -135,7 +135,7 @@ async function attach(uid) {
 export function initAuth() {
   if (!HAS_FIREBASE || authStarted) return
   authStarted = true
-  onAuth((user) => {
+  const settle = onAuth((user) => {
     authUser = user
     authState = user ? 'signed-in' : 'signed-out'
     if (user) {
@@ -146,6 +146,12 @@ export function initAuth() {
       cloudReviews = []
       cloudPlan = null
     }
+    emit()
+  })
+  // If Firebase never answers, fall back to the signed-out screen rather than
+  // leaving someone staring at a spinner.
+  Promise.resolve(settle).catch(() => {
+    authState = 'signed-out'
     emit()
   })
 }

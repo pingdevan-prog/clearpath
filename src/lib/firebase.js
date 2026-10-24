@@ -16,12 +16,14 @@ async function load() {
   if (!HAS_FIREBASE) return null
   if (!appPromise) {
     appPromise = (async () => {
-      const [{ initializeApp }, auth, firestore] = await Promise.all([
+      const [{ initializeApp, getApps, getApp }, auth, firestore] = await Promise.all([
         import('firebase/app'),
         import('firebase/auth'),
         import('firebase/firestore'),
       ])
-      const app = initializeApp(firebaseConfig)
+      // Reuse the app if one already exists — a hot reload or a second caller
+      // must not try to initialise the SDK twice.
+      const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
       const authInstance = auth.getAuth(app)
       // Keep people signed in across visits, the way an app should.
       await auth.setPersistence(authInstance, auth.browserLocalPersistence).catch(() => {})
@@ -41,7 +43,15 @@ export { load as loadFirebase, HAS_FIREBASE }
 
 /** Call fn whenever the signed-in user changes. Returns an unsubscribe. */
 export async function onAuth(fn) {
-  const fb = await load()
+  let fb
+  try {
+    fb = await load()
+  } catch (err) {
+    // A broken config must not strand the app on a loading screen forever.
+    console.warn('[clearpath] Firebase failed to load:', err?.message)
+    fn(null)
+    return () => {}
+  }
   if (!fb) {
     fn(null)
     return () => {}

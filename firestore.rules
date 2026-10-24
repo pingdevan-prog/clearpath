@@ -3,7 +3,7 @@ rules_version = '2';
 // ---------------------------------------------------------------------------
 // Clearpath security rules.
 //
-// The Firebase config in the app is public — every Firebase web app ships it.
+// The Firebase config in the app is public -- every Firebase web app ships it.
 // THIS file is what actually protects the data. Paste it into
 // console.firebase.google.com -> Firestore Database -> Rules -> Publish.
 //
