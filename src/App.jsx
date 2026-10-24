@@ -9,6 +9,7 @@ import { ReviewForm } from './components/ReviewForm'
 import { CompareView } from './components/CompareView'
 import { ProfileView, SchoolsView } from './components/ProfileView'
 import { PlanView } from './components/PlanView'
+import { AuthLoading, CarryOverPrompt, SignIn } from './components/SignIn'
 import { SampleBanner } from './components/Bits'
 
 export default function App() {
@@ -20,8 +21,14 @@ export default function App() {
   // Every write goes through the store, and every write re-renders the app.
   useEffect(() => store.subscribe(() => setVersion((v) => v + 1)), [])
 
+  // Start listening for the signed-in Google account, if accounts are set up.
+  useEffect(() => store.initAuth(), [])
+
+  const authState = store.getAuthState()
+  const authUser = store.getAuthUser()
   const profile = store.getProfile()
   const mySchools = store.getMySchools()
+  const carryOver = store.localCarryOver()
   const school = store.getActiveSchool()
   const samplesOn = store.samplesEnabled()
 
@@ -45,12 +52,19 @@ export default function App() {
     [courseId, school?.id, version]
   )
 
+  // --------------------------- signed in, or not yet ---------------------------
+  if (store.cloudEnabled()) {
+    if (authState === 'loading') return <AuthLoading />
+    if (authState === 'signed-out') return <SignIn onSignIn={() => store.signIn()} />
+  }
+
   // ------------------------------- first run -------------------------------
   if (!profile || !school) {
     return (
       <Onboarding
         schools={store.getAllSchools()}
         profile={profile}
+        suggested={authUser}
         myschools={mySchools}
         onCreateProfile={(p) => store.saveProfile(p)}
         onAddSchool={(id) => store.addSchool(id)}
@@ -75,6 +89,14 @@ export default function App() {
         go('browse')
       }}
     >
+      {carryOver && (
+        <CarryOverPrompt
+          carry={carryOver}
+          onImport={() => store.importLocalData()}
+          onDismiss={() => store.dismissCarryOver()}
+        />
+      )}
+
       {samplesOn && <SampleBanner onOff={() => store.setSamplesEnabled(false)} />}
 
       {view === 'browse' && (
@@ -165,6 +187,8 @@ export default function App() {
           onDeleteReview={(id) => store.deleteReview(id)}
           onToggleSamples={(on) => store.setSamplesEnabled(on)}
           onReset={() => store.resetEverything()}
+          authUser={authUser}
+          onSignOut={() => store.signOut()}
           onOpenCourse={(id) => go('course', id)}
         />
       )}

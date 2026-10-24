@@ -85,6 +85,53 @@ Four scores out of 10 and one yes/no, defined in `src/lib/metrics.js`:
 Optional: hours a week, grade you were in, year you took it, what the class was like
 (fast pace, test heavy, lots of projects…), and a note.
 
+## Accounts (Google sign-in)
+
+Clearpath can run two ways, and the switch is one file.
+
+**Without Firebase configured** (how it ships): no sign-in, everything lives in that
+browser's localStorage. Good for a demo, lost if you clear your browser.
+
+**With Firebase configured**: sign in with Google, and your profile, reviews and four
+year plan are saved to your account and follow you to any device.
+
+### Turning accounts on
+
+1. Make a free project at [console.firebase.google.com](https://console.firebase.google.com).
+   Google Analytics is not needed.
+2. **Authentication** → Get started → **Google** → enable → save.
+3. **Firestore Database** → Create database → start in **production mode** (the rules below
+   replace the defaults) → pick a location near you.
+4. **Project settings** → Your apps → **Web** (`</>`) → register the app. Copy the
+   `firebaseConfig` object it shows you.
+5. Paste those values into `src/lib/firebaseConfig.js`.
+6. **Firestore Database → Rules** → paste the whole of `firestore.rules` from this repo →
+   Publish. This step is not optional: it is the only thing standing between your database
+   and the open internet.
+7. **Authentication → Settings → Authorized domains** → add `pingdevan-prog.github.io`,
+   so sign-in works on the live site and not just on localhost.
+8. `npm run build:share`, commit, push.
+
+The config values in step 5 are **not secrets**. Every Firebase web app ships them in its
+JavaScript; they identify the project rather than granting access to it. The security
+rules are what protect the data.
+
+### What an account stores
+
+```
+users/{uid}                 your profile and your schools   — only you can read it
+reviews/{uid}__{courseId}   one review per class per person — anyone can read
+plans/{uid}__{schoolId}     your four year plan             — only you can read it
+```
+
+Two consequences worth knowing. The review id contains your account id, which is what
+stops one person reviewing the same class ten times. And profiles are private precisely
+so an anonymous review cannot be traced back to a name — to anyone reading the database,
+an account id is an opaque string.
+
+Signing in for the first time on a browser that already had reviews in it offers to move
+them into the account.
+
 ## Product rules baked into the code
 
 These are deliberate, not oversights:

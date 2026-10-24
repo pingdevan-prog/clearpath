@@ -20,6 +20,8 @@ export function ProfileView({
   onToggleSamples,
   onReset,
   onOpenCourse,
+  authUser,
+  onSignOut,
 }) {
   const [editing, setEditing] = useState(false)
   const [confirmReset, setConfirmReset] = useState(false)
@@ -51,6 +53,21 @@ export function ProfileView({
               </div>
               <button type="button" className="chip shrink-0" onClick={() => setEditing(true)}>
                 Edit
+              </button>
+            </div>
+          )}
+
+          {authUser && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+              <div className="min-w-0">
+                <div className="eyebrow">Signed in with Google</div>
+                <div className="mt-0.5 truncate text-[13.5px] text-ink-2">{authUser.email}</div>
+                <div className="mt-1 text-[12px] leading-snug text-muted">
+                  Your reviews and plan are saved to this account, on every device you sign into.
+                </div>
+              </div>
+              <button type="button" className="chip shrink-0" onClick={onSignOut}>
+                Sign out
               </button>
             </div>
           )}
@@ -187,8 +204,12 @@ export function ProfileView({
                 reviews a class shows words instead of numbers.
               </li>
               <li>
-                <span className="font-semibold text-ink-2">On this device.</span> Your profile and
-                reviews are stored in this browser, not on a server.
+                <span className="font-semibold text-ink-2">
+                  {authUser ? 'Tied to your account.' : 'On this device.'}
+                </span>{' '}
+                {authUser
+                  ? 'Your profile, reviews and plan are saved to your Google account, so they follow you to any device. Other students never see which account wrote a review.'
+                  : 'Your profile and reviews are stored in this browser, not on a server.'}
               </li>
             </ul>
           </div>
@@ -197,8 +218,9 @@ export function ProfileView({
               <div>
                 <h3 className="text-[15px] font-semibold text-warn">Erase everything?</h3>
                 <p className="mt-1.5 text-[13.5px] leading-relaxed text-muted">
-                  Your profile, your schools and every review you wrote on this device. This cannot be
-                  undone.
+                  {authUser
+                    ? 'This clears what is stored in this browser. Anything saved to your Google account stays — delete those reviews individually above.'
+                    : 'Your profile, your schools and every review you wrote on this device. This cannot be undone.'}
                 </p>
                 <div className="mt-3 flex gap-2.5">
                   <button

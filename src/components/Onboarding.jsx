@@ -7,8 +7,10 @@ import { Avatar, Logo, Mark, SchoolTile } from './Bits'
  * First run: make a profile, then add your school. Two steps, nothing optional
  * dressed up as required.
  */
-export function Onboarding({ schools, onCreateProfile, profile, onAddSchool, onOpenSchool, myschools }) {
-  const [step, setStep] = useState(profile ? 'school' : 'welcome')
+export function Onboarding({ schools, onCreateProfile, profile, onAddSchool, onOpenSchool, myschools, suggested }) {
+  // Someone who just signed in with Google has already seen the pitch on the
+  // sign-in screen, so send them straight to making their profile.
+  const [step, setStep] = useState(profile ? 'school' : suggested ? 'profile' : 'welcome')
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' })
@@ -18,6 +20,7 @@ export function Onboarding({ schools, onCreateProfile, profile, onAddSchool, onO
   if (step === 'profile')
     return (
       <ProfileStep
+        suggested={suggested}
         onDone={(p) => {
           onCreateProfile(p)
           setStep('school')
@@ -97,8 +100,8 @@ function handleFrom(name) {
     .slice(0, 16)
 }
 
-function ProfileStep({ onDone }) {
-  const [name, setName] = useState('')
+function ProfileStep({ onDone, suggested }) {
+  const [name, setName] = useState(suggested?.displayName || '')
   const [handle, setHandle] = useState('')
   const [handleEdited, setHandleEdited] = useState(false)
   const [grade, setGrade] = useState(null)
@@ -117,8 +120,9 @@ function ProfileStep({ onDone }) {
           Make your profile
         </h1>
         <p className="mt-2 text-[15px] leading-relaxed text-muted">
-          Your name is never attached to a review unless you choose to attach it. Reviews post
-          anonymously by default.
+          {suggested
+            ? 'Pulled from your Google account — change anything you like. Your name is never attached to a review unless you choose to attach it.'
+            : 'Your name is never attached to a review unless you choose to attach it. Reviews post anonymously by default.'}
         </p>
 
         <div className="card mt-7 p-5">

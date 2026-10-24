@@ -1,0 +1,105 @@
+rules_version = '2';
+
+// ---------------------------------------------------------------------------
+// Clearpath security rules.
+//
+// The Firebase config in the app is public — every Firebase web app ships it.
+// THIS file is what actually protects the data. Paste it into
+// console.firebase.google.com -> Firestore Database -> Rules -> Publish.
+//
+// The shape it enforces:
+//   - Reviews are readable by anyone. That is the whole point of a review site.
+//   - Only a signed-in person can write, and only under their own id.
+//   - One review per class per person, enforced by the document id.
+//   - A profile and a four year plan are readable only by the person they
+//     belong to, so nobody can map an anonymous review back to a name.
+// ---------------------------------------------------------------------------
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // A score is either absent or a whole number from 1 to 10.
+    function scoreOk(scores, key) {
+      return !(key in scores)
+        || (scores[key] is int && scores[key] >= 1 && scores[key] <= 10);
+    }
+
+    function scoresOk(scores) {
+      return scores is map
+        && scores.keys().hasOnly(['difficulty', 'workload', 'fun', 'value'])
+        && scoreOk(scores, 'difficulty')
+        && scoreOk(scores, 'workload')
+        && scoreOk(scores, 'fun')
+        && scoreOk(scores, 'value');
+    }
+
+    function reviewOk(d, uid, courseId) {
+      return d.uid == uid
+        && d.courseId == courseId
+        && d.courseId is string && d.courseId.size() > 0 && d.courseId.size() < 120
+        && d.schoolId is string && d.schoolId.size() > 0 && d.schoolId.size() < 60
+        && d.takeAgain is bool
+        && scoresOk(d.scores)
+        && d.note is string && d.note.size() <= 400
+        && d.tags is list && d.tags.size() <= 12
+        && d.anon is bool
+        && (d.gradeTaken == null || (d.gradeTaken is int && d.gradeTaken >= 9 && d.gradeTaken <= 12))
+        && (d.hours == null || d.hours is string)
+        && (d.year == null || d.year is string)
+        // A review signed with a name may only carry the name of its author.
+        && (d.anon == true ? d.author == null : d.author is map);
+    }
+
+    // ------------------------------- profiles -------------------------------
+    // Yours alone. Keeping these private is what keeps anonymous reviews
+    // anonymous: without them, an account id is just an opaque string.
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && (!('name' in request.resource.data)
+            || (request.resource.data.name is string
+                && request.resource.data.name.size() <= 60))
+        && (!('schools' in request.resource.data)
+            || (request.resource.data.schools is list
+                && request.resource.data.schools.size() <= 20));
+      allow delete: if isOwner(uid);
+    }
+
+    // -------------------------------- reviews --------------------------------
+    // The document id is "<uid>__<courseId>", which is what makes it impossible
+    // to post the same class twice, and what ties a review to its author.
+    match /reviews/{reviewId} {
+      allow read: if true;
+
+      allow create, update: if signedIn()
+        && reviewId == request.auth.uid + '__' + request.resource.data.courseId
+        && reviewOk(request.resource.data, request.auth.uid, request.resource.data.courseId);
+
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // --------------------------------- plans ---------------------------------
+    // A four year plan is nobody else's business.
+    match /plans/{planId} {
+      allow read, delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create, update: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && planId == request.auth.uid + '__' + request.resource.data.schoolId
+        && request.resource.data.grades is map;
+    }
+
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

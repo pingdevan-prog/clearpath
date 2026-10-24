@@ -1,15 +1,21 @@
 // ---------------------------------------------------------------------------
 // The only place the app touches stored data.
 //
-// Today everything lives in localStorage: your profile, the schools you added,
-// the reviews written on this device. Tomorrow, swap the bodies of these
-// functions for fetch() calls and not one component has to change.
+// Two backends, one API. Signed in with Google, everything lives in Firestore
+// and follows you to any device. Not signed in — or Firebase not configured at
+// all — everything stays in this browser, exactly as it did before accounts.
+//
+// Every getter here is synchronous on purpose: the cloud listeners keep an
+// in-memory copy up to date and call emit(), so components stay simple and
+// never deal with promises or loading spinners for data they already have.
 // ---------------------------------------------------------------------------
 
 import { COURSES, COURSE_MAP } from '../data/courses'
 import { SCHOOLS, SCHOOL_MAP } from '../data/schools'
 import { buildSampleReviews } from '../data/sampleReviews'
 import { summarize } from './stats'
+import { HAS_FIREBASE, onAuth, signInWithGoogle, signOutOfGoogle } from './firebase'
+import * as cloud from './cloud'
 
 const KEY = {
   profile: 'clearpath.profile.v1',
@@ -19,6 +25,7 @@ const KEY = {
   compare: 'clearpath.compare.v1',
   samples: 'clearpath.samples.v1',
   plan: 'clearpath.plan.v1',
+  migrated: 'clearpath.migrated.v1',
 }
 
 const listeners = new Set()
@@ -41,6 +48,8 @@ function write(key, value) {
   }
 }
 
+// ------------------------------- local state -------------------------------
+
 let profile = read(KEY.profile, null)
 let mySchools = read(KEY.schools, [])
 let activeSchool = read(KEY.active, null)
@@ -48,6 +57,19 @@ let reviews = read(KEY.reviews, [])
 let compare = read(KEY.compare, [])
 let samplesOn = read(KEY.samples, false)
 let plans = read(KEY.plan, {})
+let migrationDone = read(KEY.migrated, false)
+
+// ------------------------------- cloud state -------------------------------
+
+let authState = HAS_FIREBASE ? 'loading' : 'local'
+let authUser = null
+let cloudProfile = null
+let cloudReviews = []
+let cloudPlan = null
+let unsubscribers = []
+let authStarted = false
+
+const signedIn = () => authState === 'signed-in' && !!authUser
 
 function emit() {
   for (const fn of listeners) fn()
@@ -58,13 +80,102 @@ export function subscribe(fn) {
   return () => listeners.delete(fn)
 }
 
-// ----------------------------------- profile -----------------------------------
+// ----------------------------------- auth -----------------------------------
+
+export function getAuthState() {
+  return authState
+}
+
+export function getAuthUser() {
+  return authUser
+}
+
+export function cloudEnabled() {
+  return HAS_FIREBASE
+}
+
+function detach() {
+  for (const un of unsubscribers) {
+    try {
+      un()
+    } catch {
+      /* already gone */
+    }
+  }
+  unsubscribers = []
+}
+
+async function attach(uid) {
+  detach()
+  const add = (p) => p.then((un) => unsubscribers.push(un)).catch(() => {})
+  add(
+    cloud.watchProfile(uid, (data) => {
+      cloudProfile = data
+      if (data?.activeSchool && !activeSchool) activeSchool = data.activeSchool
+      emit()
+    })
+  )
+  if (activeSchool) {
+    add(
+      cloud.watchReviews(activeSchool, (list) => {
+        cloudReviews = list
+        emit()
+      })
+    )
+    add(
+      cloud.watchPlan(uid, activeSchool, (grades) => {
+        cloudPlan = grades
+        emit()
+      })
+    )
+  }
+}
+
+/** Start listening for the signed-in user. Safe to call more than once. */
+export function initAuth() {
+  if (!HAS_FIREBASE || authStarted) return
+  authStarted = true
+  onAuth((user) => {
+    authUser = user
+    authState = user ? 'signed-in' : 'signed-out'
+    if (user) {
+      attach(user.uid)
+    } else {
+      detach()
+      cloudProfile = null
+      cloudReviews = []
+      cloudPlan = null
+    }
+    emit()
+  })
+}
+
+export async function signIn() {
+  await signInWithGoogle()
+}
+
+export async function signOut() {
+  await signOutOfGoogle()
+  detach()
+  cloudProfile = null
+  cloudReviews = []
+  cloudPlan = null
+  emit()
+}
+
+// ---------------------------------- profile ----------------------------------
 
 export function getProfile() {
-  return profile
+  return signedIn() ? cloudProfile : profile
 }
 
 export function saveProfile(next) {
+  if (signedIn()) {
+    cloudProfile = { ...(cloudProfile || {}), ...next, createdAt: cloudProfile?.createdAt || Date.now() }
+    cloud.saveProfile(authUser.uid, cloudProfile)
+    emit()
+    return cloudProfile
+  }
   profile = { ...(profile || {}), ...next, updatedAt: Date.now() }
   if (!profile.createdAt) profile.createdAt = Date.now()
   write(KEY.profile, profile)
@@ -80,6 +191,7 @@ export function resetEverything() {
   compare = []
   samplesOn = false
   plans = {}
+  migrationDone = false
   for (const k of Object.values(KEY)) {
     try {
       localStorage.removeItem(k)
@@ -90,7 +202,7 @@ export function resetEverything() {
   emit()
 }
 
-// ----------------------------------- schools -----------------------------------
+// ---------------------------------- schools ----------------------------------
 
 export function getAllSchools() {
   return SCHOOLS
@@ -101,11 +213,19 @@ export function getSchool(id) {
 }
 
 export function getMySchools() {
-  return mySchools.map((id) => SCHOOL_MAP[id]).filter(Boolean)
+  const ids = signedIn() ? cloudProfile?.schools || [] : mySchools
+  return ids.map((id) => SCHOOL_MAP[id]).filter(Boolean)
 }
 
 export function addSchool(id) {
   if (!SCHOOL_MAP[id]) return
+  if (signedIn()) {
+    const ids = cloudProfile?.schools || []
+    if (!ids.includes(id)) saveProfile({ schools: [...ids, id] })
+    if (!activeSchool) setActiveSchool(id)
+    else emit()
+    return
+  }
   if (!mySchools.includes(id)) {
     mySchools = [...mySchools, id]
     write(KEY.schools, mySchools)
@@ -115,14 +235,19 @@ export function addSchool(id) {
 }
 
 export function removeSchool(id) {
-  mySchools = mySchools.filter((s) => s !== id)
-  write(KEY.schools, mySchools)
-  if (activeSchool === id) setActiveSchool(mySchools[0] || null)
+  if (signedIn()) {
+    saveProfile({ schools: (cloudProfile?.schools || []).filter((s) => s !== id) })
+  } else {
+    mySchools = mySchools.filter((s) => s !== id)
+    write(KEY.schools, mySchools)
+  }
+  if (activeSchool === id) setActiveSchool(getMySchools()[0]?.id || null)
   else emit()
 }
 
 export function getActiveSchool() {
-  return activeSchool ? SCHOOL_MAP[activeSchool] || null : null
+  const id = signedIn() ? activeSchool || cloudProfile?.activeSchool : activeSchool
+  return id ? SCHOOL_MAP[id] || null : null
 }
 
 export function setActiveSchool(id) {
@@ -130,10 +255,14 @@ export function setActiveSchool(id) {
   write(KEY.active, id)
   compare = []
   write(KEY.compare, compare)
+  if (signedIn()) {
+    cloud.saveProfile(authUser.uid, { activeSchool: id })
+    attach(authUser.uid)
+  }
   emit()
 }
 
-// ----------------------------------- courses -----------------------------------
+// ---------------------------------- courses ----------------------------------
 
 export function getCourses(schoolId = activeSchool) {
   const school = SCHOOL_MAP[schoolId]
@@ -144,7 +273,7 @@ export function getCourse(id) {
   return COURSE_MAP[id] || null
 }
 
-// ----------------------------------- reviews -----------------------------------
+// ---------------------------------- reviews ----------------------------------
 
 export function samplesEnabled() {
   return samplesOn
@@ -157,7 +286,7 @@ export function setSamplesEnabled(on) {
 }
 
 function allReviews(schoolId = activeSchool) {
-  const mine = reviews.filter((r) => r.schoolId === schoolId)
+  const mine = signedIn() ? cloudReviews : reviews.filter((r) => r.schoolId === schoolId)
   if (!samplesOn) return mine
   return [...buildSampleReviews(schoolId), ...mine]
 }
@@ -173,6 +302,9 @@ export function getReviews(courseId, schoolId) {
 }
 
 export function getMyReviews() {
+  if (signedIn()) {
+    return cloudReviews.filter((r) => r.uid === authUser.uid).sort((a, b) => b.createdAt - a.createdAt)
+  }
   return [...reviews].sort((a, b) => b.createdAt - a.createdAt)
 }
 
@@ -180,7 +312,6 @@ export function getStats(courseId, schoolId) {
   return summarize(getReviews(courseId, schoolId))
 }
 
-/** Stats for every course in the active school's catalog, keyed by course id. */
 export function getStatsByCourse(schoolId = activeSchool) {
   const byCourse = new Map()
   for (const r of allReviews(schoolId)) {
@@ -194,14 +325,16 @@ export function getStatsByCourse(schoolId = activeSchool) {
   return out
 }
 
-/**
- * Save a review. Takes the shape the form produces and fills in the rest.
- * Returns the stored review and how many reviews that course now has.
- */
+/** Have you already reviewed this class? One review per class per person. */
+export function myReviewFor(courseId) {
+  if (signedIn()) return cloudReviews.find((r) => r.uid === authUser.uid && r.courseId === courseId) || null
+  return reviews.find((r) => r.courseId === courseId) || null
+}
+
 export function addReview(input) {
-  const review = {
-    id: `r-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    schoolId: input.schoolId || activeSchool,
+  const schoolId = input.schoolId || activeSchool
+  const base = {
+    schoolId,
     courseId: input.courseId,
     scores: { ...input.scores },
     takeAgain: input.takeAgain,
@@ -211,25 +344,46 @@ export function addReview(input) {
     gradeTaken: input.gradeTaken ?? null,
     year: input.year ?? null,
     anon: input.anon !== false,
-    author:
-      input.anon === false && profile
-        ? { name: profile.name, handle: profile.handle, color: profile.color, grade: profile.grade }
-        : null,
     createdAt: Date.now(),
   }
-  reviews = [...reviews, review]
+  const who = getProfile()
+  const author =
+    input.anon === false && who
+      ? { name: who.name, handle: who.handle, color: who.color, grade: who.grade }
+      : null
+
+  if (signedIn()) {
+    const id = cloud.reviewId(authUser.uid, input.courseId)
+    const review = { ...base, id, uid: authUser.uid, author }
+    // Show it immediately; the listener reconciles when the write lands.
+    cloudReviews = [...cloudReviews.filter((r) => r.id !== id), review]
+    cloud.saveReview(authUser.uid, { ...base, author }).catch((err) => {
+      console.warn('[clearpath] review did not save:', err.message)
+    })
+    emit()
+    return { review, count: getReviews(input.courseId, schoolId).length }
+  }
+
+  const review = { ...base, id: `r-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, author }
+  reviews = [...reviews.filter((r) => r.courseId !== input.courseId), review]
   write(KEY.reviews, reviews)
   emit()
-  return { review, count: getReviews(review.courseId, review.schoolId).length }
+  return { review, count: getReviews(input.courseId, schoolId).length }
 }
 
 export function deleteReview(id) {
+  if (signedIn()) {
+    cloudReviews = cloudReviews.filter((r) => r.id !== id)
+    cloud.deleteReview(id).catch(() => {})
+    emit()
+    return
+  }
   reviews = reviews.filter((r) => r.id !== id)
   write(KEY.reviews, reviews)
   emit()
 }
 
-// ----------------------------------- compare -----------------------------------
+// ---------------------------------- compare ----------------------------------
 
 export const COMPARE_LIMIT = 2
 
@@ -253,9 +407,6 @@ export function setCompare(next) {
 }
 
 // ------------------------------- four year plan -------------------------------
-//
-// What the student took, and what they are planning to take, one list per grade.
-// Stored per school: switching schools switches plans.
 
 export const PLAN_GRADES = [9, 10, 11, 12]
 
@@ -263,34 +414,41 @@ function emptyPlan() {
   return Object.fromEntries(PLAN_GRADES.map((g) => [g, []]))
 }
 
-/** The plan for a school, as { 9: [courseId], 10: [...], 11: [...], 12: [...] }. */
-export function getPlan(schoolId = activeSchool) {
-  const saved = plans[schoolId] || {}
+function normalisePlan(saved) {
   const out = emptyPlan()
   for (const grade of PLAN_GRADES) {
-    out[grade] = Array.isArray(saved[grade]) ? saved[grade].filter((id) => COURSE_MAP[id]) : []
+    out[grade] = Array.isArray(saved?.[grade]) ? saved[grade].filter((id) => COURSE_MAP[id]) : []
   }
   return out
 }
 
-function savePlan(schoolId, next) {
+export function getPlan(schoolId = activeSchool) {
+  return normalisePlan(signedIn() ? cloudPlan : plans[schoolId])
+}
+
+function savePlanState(schoolId, next) {
+  if (signedIn()) {
+    cloudPlan = next
+    cloud.savePlan(authUser.uid, schoolId, next).catch(() => {})
+    emit()
+    return
+  }
   plans = { ...plans, [schoolId]: next }
   write(KEY.plan, plans)
   emit()
 }
 
-/** Put a course in a grade. A course can only sit in one grade at a time. */
 export function addToPlan(grade, courseId, schoolId = activeSchool) {
   const plan = getPlan(schoolId)
   for (const g of PLAN_GRADES) plan[g] = plan[g].filter((id) => id !== courseId)
   plan[grade] = [...plan[grade], courseId]
-  savePlan(schoolId, plan)
+  savePlanState(schoolId, plan)
 }
 
 export function removeFromPlan(grade, courseId, schoolId = activeSchool) {
   const plan = getPlan(schoolId)
   plan[grade] = plan[grade].filter((id) => id !== courseId)
-  savePlan(schoolId, plan)
+  savePlanState(schoolId, plan)
 }
 
 export function movePlanCourse(courseId, toGrade, schoolId = activeSchool) {
@@ -298,11 +456,50 @@ export function movePlanCourse(courseId, toGrade, schoolId = activeSchool) {
 }
 
 export function clearPlan(schoolId = activeSchool) {
-  savePlan(schoolId, emptyPlan())
+  savePlanState(schoolId, emptyPlan())
 }
 
-/** Every course id in the plan, in grade order. */
 export function planCourseIds(schoolId = activeSchool) {
   const plan = getPlan(schoolId)
   return PLAN_GRADES.flatMap((g) => plan[g])
+}
+
+// --------------------------- moving a browser into an account ---------------------------
+
+/** What is sitting in this browser that an account does not have yet. */
+export function localCarryOver() {
+  if (!signedIn() || migrationDone) return null
+  const localReviews = reviews.length
+  const localPlan = Object.values(plans).some((p) =>
+    PLAN_GRADES.some((g) => (p?.[g] || []).length)
+  )
+  if (!profile && !localReviews && !localPlan) return null
+  return { profile, reviews: localReviews, plan: localPlan }
+}
+
+/** Copy what this browser was holding into the signed-in account. */
+export async function importLocalData() {
+  if (!signedIn()) return
+  const uid = authUser.uid
+  const next = {
+    ...(profile ? { name: profile.name, handle: profile.handle, grade: profile.grade, color: profile.color } : {}),
+    schools: [...new Set([...(cloudProfile?.schools || []), ...mySchools])],
+  }
+  if (Object.keys(next).length) await cloud.saveProfile(uid, next)
+
+  for (const r of reviews) {
+    await cloud.saveReview(uid, r).catch(() => {})
+  }
+  for (const [schoolId, grades] of Object.entries(plans)) {
+    if (PLAN_GRADES.some((g) => (grades?.[g] || []).length)) {
+      await cloud.savePlan(uid, schoolId, normalisePlan(grades)).catch(() => {})
+    }
+  }
+  dismissCarryOver()
+}
+
+export function dismissCarryOver() {
+  migrationDone = true
+  write(KEY.migrated, true)
+  emit()
 }
