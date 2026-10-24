@@ -26,10 +26,22 @@ const outNames = ['clearpath.html', 'index.html']
 const guard = (code) => code.replace(/<\/(script|style)/gi, '<\\/$1')
 
 const assets = readdirSync(join(dist, 'assets'))
-const jsName = assets.find((f) => f.endsWith('.js'))
+const jsFiles = assets.filter((f) => f.endsWith('.js'))
+const jsName = jsFiles[0]
 const cssName = assets.find((f) => f.endsWith('.css'))
 if (!jsName || !cssName) {
   console.error('No built assets found. Run `npm run build` first.')
+  process.exit(1)
+}
+// One file in, one file out. If the build split into chunks, only the entry
+// would get inlined and every dynamic import would 404 at runtime — which is
+// exactly the bug that adding the Firebase SDK introduced.
+if (jsFiles.length > 1) {
+  console.error(
+    `Build produced ${jsFiles.length} JS chunks, and only one can be inlined:\n  ` +
+      jsFiles.join('\n  ') +
+      '\nSet build.rollupOptions.output.inlineDynamicImports in vite.config.js.'
+  )
   process.exit(1)
 }
 
@@ -49,7 +61,14 @@ html = html.replace(
 )
 
 if (html.includes('/assets/')) {
-  console.error('Something still references /assets/ — inlining did not fully apply.')
+  console.error('Something still references /assets/ - inlining did not fully apply.')
+  process.exit(1)
+}
+// Catch relative chunk references too, which is how the split slipped past the
+// check above the first time.
+const danglingChunk = jsFiles.slice(1).find((f) => html.includes(f))
+if (danglingChunk) {
+  console.error(`The single file still points at ${danglingChunk}, which will not be served.`)
   process.exit(1)
 }
 
