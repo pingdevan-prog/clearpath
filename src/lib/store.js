@@ -66,7 +66,9 @@ let authUser = null
 let cloudProfile = null
 let cloudReviews = []
 let cloudPlan = null
-let unsubscribers = []
+let profileUnsub = null
+let schoolUnsubs = []
+let attachedSchool = undefined
 let authStarted = false
 
 const signedIn = () => authState === 'signed-in' && !!authUser
@@ -94,41 +96,89 @@ export function cloudEnabled() {
   return HAS_FIREBASE
 }
 
-function detach() {
-  for (const un of unsubscribers) {
-    try {
-      un()
-    } catch {
-      /* already gone */
-    }
+function stop(un) {
+  try {
+    if (typeof un === 'function') un()
+  } catch {
+    /* already gone */
   }
-  unsubscribers = []
 }
 
-async function attach(uid) {
-  detach()
-  const add = (p) => p.then((un) => unsubscribers.push(un)).catch(() => {})
+function detachSchool() {
+  for (const un of schoolUnsubs) stop(un)
+  schoolUnsubs = []
+  attachedSchool = undefined
+}
+
+function detachAll() {
+  stop(profileUnsub)
+  profileUnsub = null
+  detachSchool()
+}
+
+/**
+ * Listen to the reviews and plan for whichever school is open.
+ *
+ * Kept separate from the profile listener because the school is often not
+ * known yet when someone signs in on a new device: it arrives a moment later
+ * inside their profile, and these listeners have to start then, not before.
+ */
+async function attachSchool(uid) {
+  if (attachedSchool === activeSchool) return
+  detachSchool()
+  attachedSchool = activeSchool
+  const school = activeSchool
+  if (!school) {
+    cloudReviews = []
+    cloudPlan = null
+    emit()
+    return
+  }
+  cloudReviews = []
+  cloudPlan = null
+  const add = (p) =>
+    p
+      .then((un) => {
+        // The school may have changed again while this was loading.
+        if (attachedSchool === school) schoolUnsubs.push(un)
+        else stop(un)
+      })
+      .catch(() => {})
   add(
-    cloud.watchProfile(uid, (data) => {
-      cloudProfile = data
-      if (data?.activeSchool && !activeSchool) activeSchool = data.activeSchool
+    cloud.watchReviews(school, (list) => {
+      if (attachedSchool !== school) return
+      cloudReviews = list
       emit()
     })
   )
-  if (activeSchool) {
-    add(
-      cloud.watchReviews(activeSchool, (list) => {
-        cloudReviews = list
-        emit()
-      })
-    )
-    add(
-      cloud.watchPlan(uid, activeSchool, (grades) => {
-        cloudPlan = grades
-        emit()
-      })
-    )
-  }
+  add(
+    cloud.watchPlan(uid, school, (grades) => {
+      if (attachedSchool !== school) return
+      cloudPlan = grades
+      emit()
+    })
+  )
+}
+
+async function attach(uid) {
+  detachAll()
+  cloud
+    .watchProfile(uid, (data) => {
+      cloudProfile = data
+      // A fresh device knows nothing until the profile arrives; adopt the
+      // school it names and start that school's listeners now.
+      if (data?.activeSchool && !activeSchool) {
+        activeSchool = data.activeSchool
+        write(KEY.active, activeSchool)
+      }
+      attachSchool(uid)
+      emit()
+    })
+    .then((un) => {
+      profileUnsub = un
+    })
+    .catch(() => {})
+  attachSchool(uid)
 }
 
 /** Start listening for the signed-in user. Safe to call more than once. */
@@ -141,7 +191,7 @@ export function initAuth() {
     if (user) {
       attach(user.uid)
     } else {
-      detach()
+      detachAll()
       cloudProfile = null
       cloudReviews = []
       cloudPlan = null
@@ -162,7 +212,7 @@ export async function signIn() {
 
 export async function signOut() {
   await signOutOfGoogle()
-  detach()
+  detachAll()
   cloudProfile = null
   cloudReviews = []
   cloudPlan = null
@@ -263,7 +313,7 @@ export function setActiveSchool(id) {
   write(KEY.compare, compare)
   if (signedIn()) {
     cloud.saveProfile(authUser.uid, { activeSchool: id })
-    attach(authUser.uid)
+    attachSchool(authUser.uid)
   }
   emit()
 }
