@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { AVATAR_COLORS } from '../data/schools'
-import { GRADE_LEVELS, FACTORS, toneFor } from '../lib/metrics'
+import { GRADE_LEVELS, FACTORS, ROLES, profileSubtitle, toneFor } from '../lib/metrics'
 import { ordinal } from '../lib/stats'
 import { SAMPLE_COURSE_COUNT } from '../data/sampleReviews'
 import { Avatar, BackButton, Empty, SchoolTile, Toggle } from './Bits'
@@ -48,7 +48,8 @@ export function ProfileView({
                   {profile.name}
                 </h1>
                 <p className="truncate text-[13.5px] text-muted">
-                  @{profile.handle} · {profile.grade}th grade
+                  @{profile.handle}
+                  {profileSubtitle(profile) ? ` · ${profileSubtitle(profile)}` : ''}
                 </p>
               </div>
               <button type="button" className="chip shrink-0" onClick={() => setEditing(true)}>
@@ -256,9 +257,10 @@ export function ProfileView({
 
 function ProfileEditor({ profile, onSave, onCancel }) {
   const [name, setName] = useState(profile.name)
+  const [role, setRole] = useState(profile.role || (profile.grade ? 'student' : null))
   const [grade, setGrade] = useState(profile.grade)
   const [color, setColor] = useState(profile.color)
-  const ready = name.trim().length >= 2 && grade
+  const ready = name.trim().length >= 2 && role && (role !== 'student' || grade)
 
   return (
     <div>
@@ -267,20 +269,40 @@ function ProfileEditor({ profile, onSave, onCancel }) {
         <input className="field" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} />
       </div>
       <div className="mt-4">
-        <div className="eyebrow">Grade</div>
-        <div className="mt-1.5 flex gap-2">
-          {GRADE_LEVELS.map((g) => (
+        <div className="eyebrow">I am a</div>
+        <div className="mt-1.5 flex flex-wrap gap-2">
+          {ROLES.map((r) => (
             <button
-              key={g}
+              key={r.value}
               type="button"
-              onClick={() => setGrade(g)}
-              className={`chip flex-1 justify-center ${grade === g ? 'chip-on' : ''}`}
+              onClick={() => {
+                setRole(r.value)
+                if (r.value !== 'student') setGrade(null)
+              }}
+              className={`chip ${role === r.value ? 'chip-on' : ''}`}
             >
-              {g}th
+              {r.label}
             </button>
           ))}
         </div>
       </div>
+      {role === 'student' && (
+        <div className="mt-4 animate-rise-in">
+          <div className="eyebrow">Grade</div>
+          <div className="mt-1.5 flex gap-2">
+            {GRADE_LEVELS.map((g) => (
+              <button
+                key={g}
+                type="button"
+                onClick={() => setGrade(g)}
+                className={`chip flex-1 justify-center ${grade === g ? 'chip-on' : ''}`}
+              >
+                {g}th
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="mt-4">
         <div className="eyebrow">Color</div>
         <div className="mt-2 flex flex-wrap gap-2.5">
@@ -297,7 +319,7 @@ function ProfileEditor({ profile, onSave, onCancel }) {
         </div>
       </div>
       <div className="mt-5 flex gap-2.5">
-        <button type="button" className="btn-primary" disabled={!ready} onClick={() => onSave({ name: name.trim(), grade, color })}>
+        <button type="button" className="btn-primary" disabled={!ready} onClick={() => onSave({ name: name.trim(), role, grade: role === 'student' ? grade : null, color })}>
           Save
         </button>
         <button type="button" className="btn-ghost" onClick={onCancel}>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AVATAR_COLORS } from '../data/schools'
-import { GRADE_LEVELS } from '../lib/metrics'
+import { GRADE_LEVELS, ROLES, profileSubtitle } from '../lib/metrics'
 import { Avatar, Logo, Mark, SchoolTile } from './Bits'
 
 /**
@@ -104,13 +104,19 @@ function ProfileStep({ onDone, suggested }) {
   const [name, setName] = useState(suggested?.displayName || '')
   const [handle, setHandle] = useState('')
   const [handleEdited, setHandleEdited] = useState(false)
+  const [role, setRole] = useState(null)
   const [grade, setGrade] = useState(null)
   const [color, setColor] = useState(AVATAR_COLORS[0])
 
   const effectiveHandle = handleEdited ? handle : handleFrom(name)
-  const ready = name.trim().length >= 2 && effectiveHandle.length >= 3 && grade
+  // A grade is only asked of, and only required of, students.
+  const ready =
+    name.trim().length >= 2 &&
+    effectiveHandle.length >= 3 &&
+    role &&
+    (role !== 'student' || grade)
 
-  const preview = { name: name.trim() || 'Your name', color }
+  const preview = { name: name.trim() || 'Your name', color, role, grade }
 
   return (
     <Shell>
@@ -132,7 +138,7 @@ function ProfileStep({ onDone, suggested }) {
               <div className="truncate text-[17px] font-semibold text-ink">{preview.name}</div>
               <div className="truncate text-[13.5px] text-muted">
                 @{effectiveHandle || 'username'}
-                {grade ? ` · ${grade}th grade` : ''}
+                {profileSubtitle(preview) ? ` · ${profileSubtitle(preview)}` : ''}
               </div>
             </div>
           </div>
@@ -174,20 +180,47 @@ function ProfileStep({ onDone, suggested }) {
               </div>
             </div>
             <div>
-              <div className="eyebrow">Grade</div>
-              <div className="mt-1.5 flex gap-2">
-                {GRADE_LEVELS.map((g) => (
+              <div className="eyebrow">I am a</div>
+              <div className="mt-1.5 grid grid-cols-2 gap-2">
+                {ROLES.map((r) => (
                   <button
-                    key={g}
+                    key={r.value}
                     type="button"
-                    onClick={() => setGrade(g)}
-                    className={`chip flex-1 justify-center ${grade === g ? 'chip-on' : ''}`}
+                    onClick={() => {
+                      setRole(r.value)
+                      if (r.value !== 'student') setGrade(null)
+                    }}
+                    aria-pressed={role === r.value}
+                    className={`rounded-2xl border px-3.5 py-3 text-left transition-all active:scale-[0.98] ${
+                      role === r.value
+                        ? 'border-brand bg-brand-wash shadow-card'
+                        : 'border-line bg-surface hover:border-brand/40'
+                    }`}
                   >
-                    {g}th
+                    <span className="block text-[14.5px] font-semibold text-ink">{r.label}</span>
+                    <span className="mt-0.5 block text-[12px] leading-snug text-muted">{r.blurb}</span>
                   </button>
                 ))}
               </div>
             </div>
+
+            {role === 'student' && (
+              <div className="animate-rise-in">
+                <div className="eyebrow">Grade</div>
+                <div className="mt-1.5 flex gap-2">
+                  {GRADE_LEVELS.map((g) => (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => setGrade(g)}
+                      className={`chip flex-1 justify-center ${grade === g ? 'chip-on' : ''}`}
+                    >
+                      {g}th
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div>
               <div className="eyebrow">Profile color</div>
               <div className="mt-2 flex flex-wrap gap-2.5">
@@ -211,7 +244,15 @@ function ProfileStep({ onDone, suggested }) {
         <button
           type="button"
           disabled={!ready}
-          onClick={() => onDone({ name: name.trim(), handle: effectiveHandle, grade, color })}
+          onClick={() =>
+            onDone({
+              name: name.trim(),
+              handle: effectiveHandle,
+              role,
+              grade: role === 'student' ? grade : null,
+              color,
+            })
+          }
           className="btn-primary mt-6 w-full"
         >
           Continue

@@ -138,6 +138,30 @@ export const HOURS_BUCKETS = ['<1', '1–3', '3–5', '5+']
 
 export const GRADE_LEVELS = [9, 10, 11, 12]
 
+// Who you are on Clearpath. Only a student has a grade; everyone else is just
+// here to read, which is why the grade picker appears for one of these.
+export const ROLES = [
+  { value: 'student', label: 'Student', blurb: 'I take classes here' },
+  { value: 'educator', label: 'Educator', blurb: 'I teach or counsel here' },
+  { value: 'parent', label: 'Parent', blurb: 'My child goes here' },
+  { value: 'other', label: 'Other', blurb: 'Something else' },
+]
+
+export const ROLE_MAP = Object.fromEntries(ROLES.map((r) => [r.value, r]))
+
+export function roleLabel(role) {
+  return ROLE_MAP[role]?.label || null
+}
+
+/** How a profile reads under its name: "11th grade", "Educator", or nothing. */
+export function profileSubtitle(profile) {
+  if (!profile) return ''
+  if (profile.role === 'student' || (!profile.role && profile.grade)) {
+    return profile.grade ? `${profile.grade}th grade` : 'Student'
+  }
+  return roleLabel(profile.role) || ''
+}
+
 export const SCHOOL_YEARS = ['2026–27', '2025–26', '2024–25', '2023–24', '2022–23']
 
 // Averages stay hidden under this many reviews. Two opinions is not a pattern,

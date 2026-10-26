@@ -405,7 +405,7 @@ export function addReview(input) {
   const who = getProfile()
   const author =
     input.anon === false && who
-      ? { name: who.name, handle: who.handle, color: who.color, grade: who.grade }
+      ? { name: who.name, handle: who.handle, color: who.color, grade: who.grade ?? null, role: who.role ?? null }
       : null
 
   if (signedIn()) {
@@ -538,7 +538,15 @@ export async function importLocalData() {
   if (!signedIn()) return
   const uid = authUser.uid
   const next = {
-    ...(profile ? { name: profile.name, handle: profile.handle, grade: profile.grade, color: profile.color } : {}),
+    ...(profile
+      ? {
+          name: profile.name,
+          handle: profile.handle,
+          role: profile.role ?? null,
+          grade: profile.grade ?? null,
+          color: profile.color,
+        }
+      : {}),
     schools: [...new Set([...(cloudProfile?.schools || []), ...mySchools])],
   }
   if (Object.keys(next).length) await cloud.saveProfile(uid, next)

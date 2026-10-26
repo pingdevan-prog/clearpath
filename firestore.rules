@@ -70,7 +70,15 @@ service cloud.firestore {
                 && request.resource.data.name.size() <= 60))
         && (!('schools' in request.resource.data)
             || (request.resource.data.schools is list
-                && request.resource.data.schools.size() <= 20));
+                && request.resource.data.schools.size() <= 20))
+        && (!('role' in request.resource.data)
+            || request.resource.data.role == null
+            || request.resource.data.role in ['student', 'educator', 'parent', 'other'])
+        && (!('grade' in request.resource.data)
+            || request.resource.data.grade == null
+            || (request.resource.data.grade is int
+                && request.resource.data.grade >= 9
+                && request.resource.data.grade <= 12));
       allow delete: if isOwner(uid);
     }
 
