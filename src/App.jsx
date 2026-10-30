@@ -150,10 +150,12 @@ export default function App() {
           courseMap={COURSE_MAP}
           statsByCourse={statsByCourse}
           plan={plan}
+          profile={profile}
           onAdd={(grade, id) => store.addToPlan(grade, id, school.id)}
           onRemove={(grade, id) => store.removeFromPlan(grade, id, school.id)}
           onMove={(id, to) => store.movePlanCourse(id, to, school.id)}
           onClear={() => store.clearPlan(school.id)}
+          onApplyPlan={(years) => store.replacePlan(years, school.id)}
           onOpenCourse={(id) => go('course', id)}
         />
       )}

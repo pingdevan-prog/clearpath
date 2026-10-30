@@ -132,6 +132,38 @@ an account id is an opaque string.
 Signing in for the first time on a browser that already had reviews in it offers to move
 them into the account.
 
+## The schedule advisor
+
+The Plan tab opens with an advisor that reads the catalog, every prerequisite, and every
+review, then builds a four year schedule and answers questions about it.
+
+It is **not** a language model, and that is the point. It cannot invent a course that
+does not exist, cannot put AP Calculus before Algebra II, and cannot forget the half
+credit of Health. Every course it suggests carries the reason it was chosen.
+
+- `src/data/pathways.js` — what a student might be aiming at (engineering, pre-med,
+  arts…), which departments serve it, and what a stated college ambition implies for
+  course load. Deliberately no admissions predictions.
+- `src/data/sequences.js` — the required spine: English every year, the maths ladder,
+  two credits of one language, PE, Health, Fine Arts.
+- `src/lib/advisor.js` — scores every course against what the student asked for and lays
+  the plan out year by year. Fills graduation requirements first, then preferences.
+- `src/lib/answers.js` — turns a typed question into an answer built from real data.
+
+What it handles: build a schedule for a major or a college, make it harder or lighter,
+cut the homework, lean into STEM or the arts, what the prerequisites for a class are,
+what a class unlocks, which class is easiest or most fun, and whether you are on track to
+graduate.
+
+### Adding a real language model
+
+An LLM would make the free-form conversation better, and the engine above would keep it
+honest by handing it real courses instead of letting it guess. It needs somewhere
+server-side to hold an API key — a key shipped in a static site is a key anyone can spend.
+The cheapest honest route is a Cloudflare Worker (free tier, no card) proxying to an LLM
+API, with the app calling the worker. Nothing in `answers.js` has to be thrown away: it
+becomes the set of tools the model calls.
+
 ## Product rules baked into the code
 
 These are deliberate, not oversights:

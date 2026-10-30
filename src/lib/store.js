@@ -511,6 +511,11 @@ export function movePlanCourse(courseId, toGrade, schoolId = activeSchool) {
   addToPlan(toGrade, courseId, schoolId)
 }
 
+/** Swap the whole plan in one go, which is how the advisor applies one. */
+export function replacePlan(years, schoolId = activeSchool) {
+  savePlanState(schoolId, normalisePlan(years))
+}
+
 export function clearPlan(schoolId = activeSchool) {
   savePlanState(schoolId, emptyPlan())
 }

@@ -105,6 +105,8 @@ def clean_title(raw):
     m = re.search(r'\s*\(([^()a-z]*(?:and [^()a-z]*)?)\)$', t)
     if m and any(ch.isdigit() for ch in m.group(1)):
         t = t[:m.start()].strip()
+    # A trailing "(Sptss)"-style abbreviation is a course code, not a name.
+    t = re.sub(r'\s*[-–—]?\s*\([A-Za-z]{4,8}\)\s*$', '', t).strip()
     t = re.sub(r'[\s\-–—:,./*~]+$', '', t).strip()
     return smart_title(t)
 

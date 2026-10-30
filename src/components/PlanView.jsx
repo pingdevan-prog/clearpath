@@ -5,6 +5,7 @@ import { PLAN_NAME, PLAN_URL, REQUIREMENTS, TOTAL_CREDITS, tallyCredits } from '
 import { MIN_REVIEWS, deptHue, deptShort, verdictFor } from '../lib/metrics'
 import { gradeLabel } from '../lib/stats'
 import { DeptTag, Empty, LevelPill } from './Bits'
+import { Advisor } from './Advisor'
 
 const GRADE_NAMES = { 9: 'Freshman', 10: 'Sophomore', 11: 'Junior', 12: 'Senior' }
 
@@ -14,9 +15,22 @@ const GRADE_NAMES = { 9: 'Freshman', 10: 'Sophomore', 11: 'Junior', 12: 'Senior'
  * things people get wrong: prerequisites in the wrong order, and credits that
  * do not add up by senior year.
  */
-export function PlanView({ courses, courseMap, statsByCourse, plan, onAdd, onRemove, onMove, onClear, onOpenCourse }) {
+export function PlanView({
+  courses,
+  courseMap,
+  statsByCourse,
+  plan,
+  profile,
+  onAdd,
+  onRemove,
+  onMove,
+  onClear,
+  onApplyPlan,
+  onOpenCourse,
+}) {
   const [picking, setPicking] = useState(null) // the grade being added to
   const [confirmClear, setConfirmClear] = useState(false)
+  const [advisorOpen, setAdvisorOpen] = useState(false)
 
   const index = useMemo(() => buildNameIndex(courses), [courses])
 
@@ -90,6 +104,45 @@ export function PlanView({ courses, courseMap, statsByCourse, plan, onAdd, onRem
           </div>
         )}
       </div>
+
+      {/* The advisor sits above the years: it is the fastest way to fill them. */}
+      <section className="mt-6">
+        {advisorOpen ? (
+          <Advisor
+            statsByCourse={statsByCourse}
+            plan={plan}
+            profile={profile}
+            onApplyPlan={onApplyPlan}
+            onOpenCourse={onOpenCourse}
+            onClose={() => setAdvisorOpen(false)}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAdvisorOpen(true)}
+            className="card flex w-full items-center gap-3.5 p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-lift"
+          >
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[13px] bg-brand">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="white" strokeWidth="2">
+                <path
+                  d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15.5px] font-semibold text-ink">
+                Ask the advisor to build it for you
+              </span>
+              <span className="mt-0.5 block text-[13px] leading-snug text-muted">
+                Tell it what you want to study, how hard you want to work, or what you like. It reads
+                every review and every prerequisite.
+              </span>
+            </span>
+            <span className="shrink-0 text-[13px] font-semibold text-brand">Open</span>
+          </button>
+        )}
+      </section>
 
       <CreditSummary tally={tally} warnings={totalWarnings} planned={all.length} />
 

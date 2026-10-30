@@ -1228,7 +1228,7 @@ export const COURSES = [
   },
   {
     id: "model-united-nations-sptss",
-    name: "Model United Nations - (Sptss)",
+    name: "Model United Nations",
     dept: "Social Studies",
     group: "Electives",
     level: "On-level",
