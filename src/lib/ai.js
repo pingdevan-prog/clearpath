@@ -16,15 +16,21 @@ export { HAS_LLM }
 // request, so this is also the cost ceiling for a single question.
 const MAX_ROUNDS = 6
 
+/**
+ * Only the first name is sent, never the surname, the email or the account id.
+ * On a free API tier the provider may use requests to improve their models, and
+ * this is a school app full of real students — there is no reason the model
+ * needs more than a first name to be friendly.
+ */
 export function systemPrompt(ctx) {
   const { profile, school } = ctx
   return `You are the Clearpath course advisor for ${school?.name || 'this high school'}.
 You help students choose high school classes and build a four year plan.
 
 WHO YOU ARE TALKING TO
-${profile?.name ? `Name: ${profile.name}.` : ''} ${profile?.role ? `They are a ${profile.role}.` : ''} ${
-    profile?.grade ? `They are in grade ${profile.grade}.` : ''
-  }
+${profile?.name ? `First name: ${profile.name.split(' ')[0]}.` : ''} ${
+    profile?.role ? `They are a ${profile.role}.` : ''
+  } ${profile?.grade ? `They are in grade ${profile.grade}.` : ''}
 
 HOW YOU KNOW ANYTHING
 You have tools that read the real course catalog, the real student reviews, and

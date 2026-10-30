@@ -11,9 +11,14 @@
 // ---------------------------------------------------------------------------
 
 import Anthropic from '@anthropic-ai/sdk'
+import { streamGemini } from './gemini'
 
 export interface Env {
-  ANTHROPIC_API_KEY: string
+  // Whichever of these is set decides who answers. Gemini wins if both are,
+  // because it is the free one and that is the likely intent.
+  GEMINI_API_KEY?: string
+  ANTHROPIC_API_KEY?: string
+  GEMINI_MODEL?: string
   ALLOWED_ORIGINS: string
 }
 
@@ -26,6 +31,11 @@ const MAX_TOKENS = 4096
 //   claude-haiku-5-5   $0.10 /  $0.50 / $0.20   ~40x cheaper in, weaker on open questions
 // Change this one line to move between them.
 const MODEL = 'claude-opus-5-5'
+
+// Gemini's free tier. Flash-class models are the ones with a usable free
+// quota; Pro is restricted or paid. Override with a GEMINI_MODEL var if this
+// id is not one your key can use — the worker will tell you which are.
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
 
 function corsHeaders(origin: string | null, env: Env): Record<string, string> {
   const allowed = (env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean)
@@ -55,8 +65,13 @@ export default {
     if (origin && allowed.length && !allowed.includes(origin)) {
       return json({ error: 'Origin not allowed' }, 403, cors)
     }
-    if (!env.ANTHROPIC_API_KEY) {
-      return json({ error: 'The worker has no ANTHROPIC_API_KEY set.' }, 500, cors)
+    const useGemini = !!env.GEMINI_API_KEY
+    if (!useGemini && !env.ANTHROPIC_API_KEY) {
+      return json(
+        { error: 'The worker has no GEMINI_API_KEY or ANTHROPIC_API_KEY set.' },
+        500,
+        cors
+      )
     }
 
     let body: { system?: string; messages?: unknown; tools?: unknown }
@@ -76,62 +91,60 @@ export default {
       return json({ error: 'Conversation too long' }, 400, cors)
     }
 
-    const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
+    const encoder = new TextEncoder()
+    const sse = (controller: ReadableStreamDefaultController, event: unknown) =>
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
 
-    try {
-      const stream = client.messages.stream({
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
-        // The system prompt and the six tool definitions are ~2,000 tokens and
-        // byte-identical on every request, and a tool round re-sends the whole
-        // conversation. Caching the prefix drops those repeats from $4 to
-        // $0.20 per million tokens, which is most of what a chat costs.
-        cache_control: { type: 'ephemeral' },
-        // Adaptive thinking at low effort: this is a chat advisor, and the
-        // hard reasoning (prerequisites, credits) is done by the tools.
-        thinking: { type: 'adaptive' },
-        output_config: { effort: 'low' },
-        system: typeof body.system === 'string' ? body.system : undefined,
-        messages: messages as Anthropic.MessageParam[],
-        tools: Array.isArray(body.tools) ? (body.tools as Anthropic.Tool[]) : undefined,
-      })
-
-      // Forward the SSE stream straight through. The browser runs the tool
-      // loop, so it needs the raw events including tool_use blocks.
-      const encoder = new TextEncoder()
-      const readable = new ReadableStream({
-        async start(controller) {
-          try {
-            for await (const event of stream) {
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
-            }
-            const final = await stream.finalMessage()
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: 'clearpath_final', message: final })}\n\n`)
-            )
-          } catch (err) {
-            const message = err instanceof Error ? err.message : 'Upstream error'
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: 'clearpath_error', error: message })}\n\n`)
-            )
-          } finally {
-            controller.close()
+    const readable = new ReadableStream({
+      async start(controller) {
+        try {
+          if (useGemini) {
+            const final = await streamGemini({
+              apiKey: env.GEMINI_API_KEY!,
+              model: env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
+              system: typeof body.system === 'string' ? body.system : undefined,
+              messages: messages as any,
+              tools: Array.isArray(body.tools) ? (body.tools as any) : undefined,
+              maxTokens: MAX_TOKENS,
+              send: (event) => sse(controller, event),
+            })
+            sse(controller, { type: 'clearpath_final', message: final })
+          } else {
+            const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY! })
+            const stream = client.messages.stream({
+              model: MODEL,
+              max_tokens: MAX_TOKENS,
+              // The system prompt and the six tool definitions are ~2,000
+              // tokens and byte-identical on every request, and a tool round
+              // re-sends the whole conversation. Caching the prefix drops
+              // those repeats from $4 to $0.20 per million tokens.
+              cache_control: { type: 'ephemeral' },
+              thinking: { type: 'adaptive' },
+              output_config: { effort: 'low' },
+              system: typeof body.system === 'string' ? body.system : undefined,
+              messages: messages as Anthropic.MessageParam[],
+              tools: Array.isArray(body.tools) ? (body.tools as Anthropic.Tool[]) : undefined,
+            })
+            for await (const event of stream) sse(controller, event)
+            sse(controller, { type: 'clearpath_final', message: await stream.finalMessage() })
           }
-        },
-      })
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Upstream error'
+          sse(controller, { type: 'clearpath_error', error: message })
+        } finally {
+          controller.close()
+        }
+      },
+    })
 
-      return new Response(readable, {
-        headers: {
-          ...cors,
-          'Content-Type': 'text/event-stream; charset=utf-8',
-          'Cache-Control': 'no-cache',
-          Connection: 'keep-alive',
-        },
-      })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
-      return json({ error: message }, 502, cors)
-    }
+    return new Response(readable, {
+      headers: {
+        ...cors,
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      },
+    })
   },
 }
 
