@@ -155,14 +155,40 @@ cut the homework, lean into STEM or the arts, what the prerequisites for a class
 what a class unlocks, which class is easiest or most fun, and whether you are on track to
 graduate.
 
-### Adding a real language model
+### Talking to it like a person
 
-An LLM would make the free-form conversation better, and the engine above would keep it
-honest by handing it real courses instead of letting it guess. It needs somewhere
-server-side to hold an API key — a key shipped in a static site is a key anyone can spend.
-The cheapest honest route is a Cloudflare Worker (free tier, no card) proxying to an LLM
-API, with the app calling the worker. Nothing in `answers.js` has to be thrown away: it
-becomes the set of tools the model calls.
+With a language model wired in, the advisor stops pattern matching and starts reasoning:
+it holds a back-and-forth, asks what it needs to know, and handles questions nobody
+anticipated. The engine above does not go away — it becomes the model's **tools**, which
+is what stops it inventing a course that does not exist.
+
+The model runs on Claude (`claude-opus-5-5`). The tools run in the browser, so the
+catalog, the reviews and the student's plan never leave the device; the worker only ever
+sees the conversation.
+
+What the model can call: `search_courses`, `get_course`, `get_my_plan`, `build_schedule`,
+`rank_courses`, `check_prerequisites`. Its system prompt says it knows nothing about this
+school except what those return — no course named from memory, no prerequisite or score
+stated without a lookup.
+
+#### Turning it on
+
+```bash
+cd worker
+npm install
+npx wrangler login                         # free Cloudflare account, no card
+npx wrangler secret put ANTHROPIC_API_KEY   # from console.anthropic.com
+npx wrangler deploy
+```
+
+Put the URL it prints into `src/lib/advisorConfig.js`, rebuild, push. Left blank, the
+advisor falls back to the offline engine and everything still works.
+
+Cloudflare Workers are free (100k requests/day). The Anthropic API is not: Opus 5.5 is
+$4 per million input tokens and $20 per million output, so a student asking a dozen
+questions costs well under a cent. Set a spend limit in the Anthropic console for a hard
+ceiling, or switch `MODEL` in `worker/src/index.ts` to `claude-haiku-5-5` for roughly
+forty times cheaper input.
 
 ## Product rules baked into the code
 

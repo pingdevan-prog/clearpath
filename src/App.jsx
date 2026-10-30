@@ -151,6 +151,7 @@ export default function App() {
           statsByCourse={statsByCourse}
           plan={plan}
           profile={profile}
+          school={school}
           onAdd={(grade, id) => store.addToPlan(grade, id, school.id)}
           onRemove={(grade, id) => store.removeFromPlan(grade, id, school.id)}
           onMove={(id, to) => store.movePlanCourse(id, to, school.id)}

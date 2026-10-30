@@ -21,6 +21,7 @@ export function PlanView({
   statsByCourse,
   plan,
   profile,
+  school,
   onAdd,
   onRemove,
   onMove,
@@ -112,6 +113,7 @@ export function PlanView({
             statsByCourse={statsByCourse}
             plan={plan}
             profile={profile}
+            school={school}
             onApplyPlan={onApplyPlan}
             onOpenCourse={onOpenCourse}
             onClose={() => setAdvisorOpen(false)}

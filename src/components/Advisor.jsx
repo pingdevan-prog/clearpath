@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { COURSE_MAP } from '../data/courses'
 import { GOALS, INTERESTS, RIGOR } from '../data/pathways'
 import { STARTERS, answer } from '../lib/answers'
+import { HAS_LLM, askAdvisor } from '../lib/ai'
 import { creditsOf } from '../lib/plan'
 import { PLAN_GRADES } from '../lib/store'
 import { deptHue, toneFor, verdictFor } from '../lib/metrics'
@@ -12,11 +13,15 @@ import { LevelPill } from './Bits'
  * answers in the only currency that matters here: real courses, with the
  * reason each one was picked.
  */
-export function Advisor({ statsByCourse, plan, profile, onApplyPlan, onOpenCourse, onClose }) {
+export function Advisor({ statsByCourse, plan, profile, school, onApplyPlan, onOpenCourse, onClose }) {
   const [messages, setMessages] = useState([
     {
       from: 'bot',
-      text: `Hi${profile?.name ? ` ${profile.name.split(' ')[0]}` : ''}. I can read all 306 courses, their prerequisites, and every review students have written. Ask me anything, or start with one of these.`,
+      text: `Hi${profile?.name ? ` ${profile.name.split(' ')[0]}` : ''}. I can read all 306 courses, their prerequisites, and every review students have written. ${
+        HAS_LLM
+          ? 'Ask me anything about your schedule.'
+          : 'Ask me anything, or start with one of these.'
+      }`,
     },
   ])
   const [input, setInput] = useState('')
@@ -34,13 +39,22 @@ export function Advisor({ statsByCourse, plan, profile, onApplyPlan, onOpenCours
     [statsByCourse, plan, profile, prefs]
   )
 
+  // The conversation as the model sees it, kept alongside the rendered one.
+  const historyRef = useRef([])
+  const abortRef = useRef(null)
+
   const send = (text) => {
     const clean = text.trim()
     if (!clean || thinking) return
     setMessages((m) => [...m, { from: 'me', text: clean }])
     setInput('')
     setThinking(true)
-    // A beat, so an instant answer does not feel like a canned one.
+    if (HAS_LLM) sendToModel(clean)
+    else sendToEngine(clean)
+  }
+
+  /** The built-in engine: instant, offline, no model. */
+  const sendToEngine = (clean) => {
     setTimeout(() => {
       const result = answer(clean, ctx)
       if (result.prefs) setPrefs(result.prefs)
@@ -50,6 +64,67 @@ export function Advisor({ statsByCourse, plan, profile, onApplyPlan, onOpenCours
     }, 260)
   }
 
+  /** Claude, with the catalog and the reviews as its tools. */
+  const sendToModel = async (clean) => {
+    historyRef.current = [...historyRef.current, { role: 'user', content: clean }]
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    // One streaming bubble that fills in as the answer arrives.
+    let streamed = ''
+    let index = -1
+    setMessages((m) => {
+      index = m.length
+      return [...m, { from: 'bot', text: '', streaming: true }]
+    })
+    const update = (patch) =>
+      setMessages((m) => m.map((msg, i) => (i === index ? { ...msg, ...patch } : msg)))
+
+    try {
+      await askAdvisor({
+        messages: historyRef.current,
+        ctx,
+        signal: controller.signal,
+        onEvent: (e) => {
+          if (e.type === 'text') {
+            streamed += e.delta
+            update({ text: streamed, streaming: true, tool: null })
+          } else if (e.type === 'tool') {
+            update({ tool: TOOL_LABELS[e.name] || 'Looking it up' })
+          } else if (e.type === 'render' && e.payload?.type === 'plan') {
+            update({ plan: e.payload.plan })
+          } else if (e.type === 'done') {
+            update({ streaming: false, tool: null })
+          } else if (e.type === 'error') {
+            update({ streaming: false, tool: null, text: streamed || e.error, error: !streamed })
+          }
+        },
+      })
+      // Keep the model's own words in its history so follow-ups make sense.
+      if (streamed) {
+        historyRef.current = [...historyRef.current, { role: 'assistant', content: streamed }]
+      }
+    } catch (err) {
+      if (err?.name !== 'AbortError') {
+        update({
+          streaming: false,
+          tool: null,
+          text:
+            streamed ||
+            `I could not reach the advisor service. ${err?.message || ''}`.trim(),
+          error: !streamed,
+          chips: streamed ? undefined : ['Build me a schedule for engineering', 'Which science class is easiest?'],
+        })
+      }
+    } finally {
+      setThinking(false)
+      abortRef.current = null
+      inputRef.current?.focus()
+    }
+  }
+
+  useEffect(() => () => abortRef.current?.abort(), [])
+
   return (
     <div className="card flex h-[32rem] flex-col overflow-hidden sm:h-[34rem]">
       <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
@@ -58,7 +133,9 @@ export function Advisor({ statsByCourse, plan, profile, onApplyPlan, onOpenCours
           <div>
             <h2 className="text-[15px] font-semibold leading-tight text-ink">Schedule advisor</h2>
             <p className="text-[12px] leading-tight text-muted">
-              Reads your plan, the catalog and every review
+              {HAS_LLM
+                ? 'Claude, reading your plan, the catalog and every review'
+                : 'Reads your plan, the catalog and every review'}
             </p>
           </div>
         </div>
@@ -87,7 +164,7 @@ export function Advisor({ statsByCourse, plan, profile, onApplyPlan, onOpenCours
           />
         ))}
 
-        {messages.length === 1 && (
+        {messages.length === 1 && !HAS_LLM && (
           <div className="flex flex-wrap gap-2 pt-1">
             {STARTERS.map((s) => (
               <button key={s.label} type="button" onClick={() => send(s.text)} className="chip">
@@ -97,7 +174,17 @@ export function Advisor({ statsByCourse, plan, profile, onApplyPlan, onOpenCours
           </div>
         )}
 
-        {thinking && (
+        {messages.length === 1 && HAS_LLM && (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {STARTERS.slice(0, 6).map((s) => (
+              <button key={s.label} type="button" onClick={() => send(s.text)} className="chip">
+                {s.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {thinking && !HAS_LLM && (
           <div className="flex items-center gap-1.5 text-muted">
             {[0, 1, 2].map((i) => (
               <span
@@ -140,6 +227,16 @@ export function Advisor({ statsByCourse, plan, profile, onApplyPlan, onOpenCours
       </form>
     </div>
   )
+}
+
+/** What to show while a tool runs, so the pause is legible. */
+const TOOL_LABELS = {
+  search_courses: 'Searching the catalog',
+  get_course: 'Reading the course',
+  get_my_plan: 'Checking your plan',
+  build_schedule: 'Building a schedule',
+  rank_courses: 'Reading the reviews',
+  check_prerequisites: 'Checking prerequisites',
 }
 
 function Spark() {
@@ -190,9 +287,33 @@ function Message({ message, onApplyPlan, onOpenCourse, onChip }) {
 
   return (
     <div className="space-y-2.5">
-      <div className="max-w-[92%] rounded-2xl rounded-bl-md bg-sunk px-3.5 py-2.5">
-        <RichText text={message.text} />
-      </div>
+      {message.tool && (
+        <div className="flex items-center gap-2 px-1 text-[12.5px] text-muted">
+          <span className="flex gap-1" aria-hidden>
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className="h-1 w-1 animate-pulse rounded-full bg-brand"
+                style={{ animationDelay: `${i * 140}ms` }}
+              />
+            ))}
+          </span>
+          {message.tool}
+        </div>
+      )}
+
+      {(message.text || !message.tool) && (
+        <div
+          className={`max-w-[92%] rounded-2xl rounded-bl-md px-3.5 py-2.5 ${
+            message.error ? 'bg-warn-soft' : 'bg-sunk'
+          }`}
+        >
+          <RichText text={message.text} />
+          {message.streaming && message.text && (
+            <span className="ml-0.5 inline-block h-3.5 w-[2px] animate-pulse bg-ink-2 align-middle" />
+          )}
+        </div>
+      )}
 
       {message.plan && <PlanProposal plan={message.plan} onApply={onApplyPlan} onOpenCourse={onOpenCourse} />}
 
