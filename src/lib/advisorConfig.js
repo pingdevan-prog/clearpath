@@ -11,6 +11,6 @@
 // which answers from the catalog and the reviews without a model.
 // ---------------------------------------------------------------------------
 
-export const ADVISOR_WORKER_URL = ''
+export const ADVISOR_WORKER_URL = 'https://clearpath-advisor.clearpathschool.workers.dev'
 
 export const HAS_LLM = Boolean(ADVISOR_WORKER_URL)

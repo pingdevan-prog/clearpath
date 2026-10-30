@@ -19,6 +19,29 @@ import { baseNames, buildNameIndex, coursesNamedIn, creditsOf } from './plan'
 import { MIN_REVIEWS } from './metrics'
 import { PLAN_GRADES } from './store'
 
+const DEPTS = [
+  'Language Arts',
+  'Mathematics',
+  'Science',
+  'Social Studies',
+  'World Languages',
+  'Fine Arts',
+  'Technology & Career Education',
+  'Health and PE',
+  'Miscellaneous Electives',
+]
+
+/**
+ * Match a department the way a model will actually type it: "SCIENCE",
+ * "science", "Math" for Mathematics. Exact matching silently returned nothing.
+ */
+export function deptMatches(courseDept, wanted) {
+  if (!wanted) return true
+  const a = courseDept.toLowerCase()
+  const b = String(wanted).toLowerCase().trim()
+  return a === b || a.startsWith(b) || (b === 'math' && a === 'mathematics') || (b === 'english' && a === 'language arts')
+}
+
 /** Everything the model is allowed to ask for. */
 export const TOOLS = [
   {
@@ -29,21 +52,7 @@ export const TOOLS = [
       type: 'object',
       properties: {
         query: { type: 'string', description: 'Words to match in the course name or description' },
-        dept: {
-          type: 'string',
-          description: 'Limit to one department',
-          enum: [
-            'Language Arts',
-            'Mathematics',
-            'Science',
-            'Social Studies',
-            'World Languages',
-            'Fine Arts',
-            'Technology & Career Education',
-            'Health and PE',
-            'Miscellaneous Electives',
-          ],
-        },
+        dept: { type: 'string', description: 'Limit to one department', enum: DEPTS },
         level: { type: 'string', enum: ['AP', 'Honors', 'On-level', 'Dual credit', 'Post AP'] },
         grade: { type: 'integer', description: 'Only courses open to this grade', minimum: 9, maximum: 12 },
         max_difficulty: { type: 'number', description: 'Only courses students rate at or below this difficulty, 1-10' },
@@ -95,7 +104,7 @@ export const TOOLS = [
       type: 'object',
       properties: {
         by: { type: 'string', enum: ['easiest', 'hardest', 'least_homework', 'most_fun', 'most_recommended'] },
-        dept: { type: 'string' },
+        dept: { type: 'string', description: 'Limit to one department', enum: DEPTS },
         grade: { type: 'integer', minimum: 9, maximum: 12 },
         limit: { type: 'integer', minimum: 1, maximum: 15 },
       },
@@ -142,6 +151,12 @@ function reviewSummary(stats) {
   }
   const a = stats.averages
   return {
+    // Put provenance FIRST and in words. A flag a model can skim past is a
+    // flag lighter models do skim past; a sentence at the top of the data
+    // they are about to quote is much harder to drop.
+    source: stats.hasSample
+      ? 'SAMPLE reviews written to demonstrate Clearpath. NOT real students. Say so if you use these numbers.'
+      : 'real student reviews',
     reviews: stats.count,
     would_take_again_pct: Math.round(stats.takeAgain * 100),
     difficulty: round(a.difficulty),
@@ -183,7 +198,7 @@ export function runTool(name, input, ctx) {
     case 'search_courses': {
       const q = norm(input.query)
       let list = COURSES.filter((c) => {
-        if (input.dept && c.dept !== input.dept) return false
+        if (!deptMatches(c.dept, input.dept)) return false
         if (input.level && c.level !== input.level) return false
         if (input.grade && c.grades.length && !c.grades.includes(input.grade)) return false
         const s = statsByCourse[c.id]
@@ -292,7 +307,7 @@ export function runTool(name, input, ctx) {
         {
           statsByCourse,
           filter: (c, s) => {
-            if (input.dept && c.dept !== input.dept) return false
+            if (!deptMatches(c.dept, input.dept)) return false
             if (input.grade && c.grades.length && !c.grades.includes(input.grade)) return false
             return s?.hasEnough
           },
@@ -353,6 +368,13 @@ export function runTool(name, input, ctx) {
     }
 
     default:
-      return { error: `Unknown tool ${name}` }
+      // Some models invent a plausible tool name ("list_departments"). Name the
+      // real ones so the next attempt lands, rather than a bare refusal it has
+      // to guess its way out of.
+      return {
+        error: `There is no tool called "${name}". The tools you have are: ${TOOLS.map(
+          (t) => t.name
+        ).join(', ')}. Use one of those.`,
+      }
   }
 }

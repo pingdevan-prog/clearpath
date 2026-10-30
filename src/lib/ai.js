@@ -12,9 +12,12 @@ import { CATALOG_SOURCE } from '../data/courses'
 
 export { HAS_LLM }
 
-// How many times the model may call tools before we stop it. Each round is one
-// request, so this is also the cost ceiling for a single question.
-const MAX_ROUNDS = 6
+// How many requests one question may make. Each round is one request, and on
+// Gemini's free tier the per-minute cap is the binding limit - a question that
+// used six rounds could eat most of a minute's quota by itself. The final round
+// runs without tools and always answers, so four is plenty: in testing the
+// model had what it needed after two or three.
+const MAX_ROUNDS = 4
 
 /**
  * Only the first name is sent, never the surname, the email or the account id.
@@ -44,8 +47,15 @@ what those tools return.
 - Call get_my_plan before any advice that depends on what they have already chosen.
 - If a tool says there are not enough reviews, say that plainly. Clearpath hides
   scores under three reviews on purpose, and a made up number is worse than none.
+- Every review summary has a "source". If it says SAMPLE, those are example
+  numbers written to demonstrate the app, not real student opinion. You may use the
+  numbers, but say once that they are sample reviews. Never write "students said"
+  or "students rated" about sample data.
 - You may reason freely about trade-offs, workload, and what suits someone. That
   is the part you are good at. The facts come from tools.
+- Be economical. Two or three lookups answer almost any question. Once you have
+  enough to give a useful answer, stop searching and give it. A student waiting
+  on a fifth search would rather have a good answer now than a perfect one later.
 
 HOUSE RULES
 - Never rate, name, or comment on a teacher. Clearpath rates courses, not people.
@@ -83,7 +93,11 @@ export async function askAdvisor({ messages, ctx, onEvent, signal }) {
   const renders = []
 
   for (let round = 0; round < MAX_ROUNDS; round += 1) {
-    const final = await streamOnce({ convo, ctx, onEvent, signal })
+    // On the last allowed round, take the tools away. The model can then only
+    // answer from what it has already looked up - which turns "went round in
+    // circles" into an actual answer every time.
+    const lastChance = round === MAX_ROUNDS - 1
+    const final = await streamOnce({ convo, ctx, onEvent, signal, allowTools: !lastChance })
     if (!final) return { renders }
 
     convo.push({ role: 'assistant', content: final.content })
@@ -117,18 +131,26 @@ export async function askAdvisor({ messages, ctx, onEvent, signal }) {
         ...(output?.error ? { is_error: true } : {}),
       })
     }
+    // Next round is the last: say so, alongside the results.
+    if (round + 1 === MAX_ROUNDS - 1) {
+      results.push({
+        type: 'text',
+        text: 'You have looked up enough. Answer the student now using what you found. Do not call any more tools.',
+      })
+    }
     convo.push({ role: 'user', content: results })
   }
 
+  // Unreachable in practice: the final round runs without tools.
   onEvent({
     type: 'error',
-    error: 'I went round in circles on that one. Try asking it a different way.',
+    error: 'I could not finish that one. Try asking it a different way.',
   })
   return { renders }
 }
 
 /** One request to the worker. Returns the final message, or null if aborted. */
-async function streamOnce({ convo, ctx, onEvent, signal }) {
+async function streamOnce({ convo, ctx, onEvent, signal, allowTools = true }) {
   const response = await fetch(ADVISOR_WORKER_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -136,7 +158,7 @@ async function streamOnce({ convo, ctx, onEvent, signal }) {
     body: JSON.stringify({
       system: systemPrompt(ctx),
       messages: convo,
-      tools: TOOLS,
+      tools: allowTools ? TOOLS : [],
     }),
   })
 

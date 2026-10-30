@@ -12,7 +12,7 @@ const API = 'https://generativelanguage.googleapis.com/v1beta'
 
 type AnthropicBlock =
   | { type: 'text'; text: string }
-  | { type: 'tool_use'; id: string; name: string; input: unknown }
+  | { type: 'tool_use'; id: string; name: string; input: unknown; gemini_thought_signature?: string }
   | { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean }
 
 interface AnthropicMessage {
@@ -76,7 +76,14 @@ function toGeminiContents(messages: AnthropicMessage[]) {
           parts.push({ text: block.text })
         } else if (block.type === 'tool_use') {
           idToName.set(block.id, block.name)
-          parts.push({ functionCall: { name: block.name, args: block.input || {} } })
+          // Gemini 3 signs each function call and rejects the next request
+          // with a 400 if the signature does not come back with it.
+          parts.push({
+            functionCall: { name: block.name, args: block.input || {} },
+            ...(block.gemini_thought_signature
+              ? { thoughtSignature: block.gemini_thought_signature }
+              : {}),
+          })
         } else if (block.type === 'tool_result') {
           const name = idToName.get(block.tool_use_id) || 'unknown_tool'
           let response: unknown
@@ -115,6 +122,7 @@ function toAnthropicMessage(parts: unknown[], finishReason: string | undefined) 
         id: `gemini_${Date.now()}_${calls}`,
         name: part.functionCall.name,
         input: part.functionCall.args || {},
+        ...(part.thoughtSignature ? { gemini_thought_signature: part.thoughtSignature } : {}),
       })
     }
   }
@@ -149,73 +157,140 @@ export async function streamGemini(opts: {
     generationConfig: { maxOutputTokens: maxTokens },
   }
 
-  const response = await fetch(
-    `${API}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-      body: JSON.stringify(body),
+  // Never hang forever: a stalled upstream should surface as a message the
+  // student can read, not a request that never returns.
+  const timeout = AbortSignal.timeout(45_000)
+  let response: Response
+  try {
+    response = await fetch(
+      `${API}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify(body),
+        signal: timeout,
+      }
+    )
+  } catch (err) {
+    if ((err as Error)?.name === 'TimeoutError') {
+      throw new Error(`Gemini did not respond within 45 seconds for model "${model}".`)
     }
-  )
+    throw err
+  }
 
   if (!response.ok) {
     const text = await response.text()
     // A wrong model id is the most likely first-run failure, and the fix is
     // knowing which ones this key can actually use. So go and find out.
-    if (response.status === 404 || /not found|not supported/i.test(text)) {
+    if (response.status === 404) {
       const names = await listModels(apiKey)
       throw new Error(
-        `Gemini rejected the model "${model}". Models this key can use: ${
+        `Gemini rejected the model "${model}" (404). Models this key can use: ${
           names.length ? names.join(', ') : 'could not list them'
-        }. Set GEMINI_MODEL on the worker to one of those.`
+        }. Set GEMINI_MODEL on the worker to one of those. Google said: ${text.slice(0, 200)}`
       )
     }
+    if (response.status === 400 || response.status === 403) {
+      // Never swallow what Google actually said - it names the field or the
+      // permission at fault, and guessing from the status code wastes an hour.
+      throw new Error(`Gemini ${response.status}: ${text.slice(0, 400)}`)
+    }
     if (response.status === 429) {
+      // Google says WHICH quota ran out - per minute or per day - and its size.
+      // That difference decides whether to wait a minute or wait until tomorrow.
+      let detail = ''
+      try {
+        const err = JSON.parse(text)?.error
+        const violations = (err?.details || []).flatMap((d: any) => d.violations || [])
+        detail = violations
+          .map((v: any) => `${v.quotaId || v.quotaMetric}${v.quotaValue ? ` (limit ${v.quotaValue})` : ''}`)
+          .join('; ')
+        const retry = (err?.details || []).find((d: any) => d.retryDelay)?.retryDelay
+        if (retry) detail += `${detail ? '; ' : ''}retry after ${retry}`
+      } catch {
+        /* keep it generic */
+      }
       throw new Error(
-        'Gemini free tier rate limit reached. It resets on its own — wait a minute, or check your quota in Google AI Studio.'
+        `Gemini free tier limit reached${detail ? `: ${detail}` : ''}. Check usage in Google AI Studio.`
       )
     }
     throw new Error(`Gemini error ${response.status}: ${text.slice(0, 300)}`)
   }
 
+  const parts: unknown[] = []
+  let finishReason: string | undefined
+  let blockReason: string | undefined
+  let raw = ''
+
+  /** Handle one SSE event's data payload. */
+  const handle = (data: string) => {
+    let payload: any
+    try {
+      payload = JSON.parse(data)
+    } catch {
+      return
+    }
+    if (payload.promptFeedback?.blockReason) blockReason = payload.promptFeedback.blockReason
+    const candidate = payload.candidates?.[0]
+    if (!candidate) return
+    if (candidate.finishReason) finishReason = candidate.finishReason
+    for (const part of candidate.content?.parts || []) {
+      // Thought summaries are not the answer; never show them as reply text.
+      if (part.thought) continue
+      if (typeof part.text === 'string' && part.text) {
+        send({ type: 'content_block_delta', delta: { type: 'text_delta', text: part.text } })
+        const last = parts[parts.length - 1] as any
+        if (last && typeof last.text === 'string') last.text += part.text
+        else parts.push({ text: part.text })
+      } else if (part.functionCall) {
+        parts.push({
+          functionCall: part.functionCall,
+          ...(part.thoughtSignature ? { thoughtSignature: part.thoughtSignature } : {}),
+        })
+      }
+    }
+  }
+
+  /** Split complete events off the front of the buffer, keep the remainder. */
+  const drain = (buffer: string, final: boolean): string => {
+    const normalised = buffer.replace(/\r\n/g, '\n')
+    const events = normalised.split('\n\n')
+    // The last piece may be a half-received event, unless the stream is over.
+    const rest = final ? '' : events.pop() || ''
+    for (const event of events) {
+      const data = event
+        .split('\n')
+        .filter((line) => line.startsWith('data:'))
+        .map((line) => line.slice(5).trim())
+        .join('')
+      if (data) handle(data)
+    }
+    return rest
+  }
+
   const reader = response.body!.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
-  const parts: unknown[] = []
-  let finishReason: string | undefined
-
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const chunks = buffer.split('\n\n')
-    buffer = chunks.pop() || ''
+    const text = decoder.decode(value, { stream: true })
+    raw += text
+    buffer = drain(buffer + text, false)
+  }
+  // Whatever is still buffered when the stream closes is the last event, and
+  // dropping it is how a whole reply goes missing.
+  buffer += decoder.decode()
+  drain(buffer, true)
 
-    for (const chunk of chunks) {
-      const line = chunk.trim()
-      if (!line.startsWith('data:')) continue
-      let payload: any
-      try {
-        payload = JSON.parse(line.slice(5).trim())
-      } catch {
-        continue
-      }
-      const candidate = payload.candidates?.[0]
-      if (!candidate) continue
-      if (candidate.finishReason) finishReason = candidate.finishReason
-
-      for (const part of candidate.content?.parts || []) {
-        if (part.text) {
-          // Same event shape the browser already handles for Claude.
-          send({ type: 'content_block_delta', delta: { type: 'text_delta', text: part.text } })
-          const last = parts[parts.length - 1] as any
-          if (last?.text !== undefined) last.text += part.text
-          else parts.push({ text: part.text })
-        } else if (part.functionCall) {
-          parts.push({ functionCall: part.functionCall })
-        }
-      }
-    }
+  if (!parts.length) {
+    throw new Error(
+      `Gemini returned no content for model "${model}" (finishReason: ${
+        finishReason || 'none'
+      }${blockReason ? `, blocked: ${blockReason}` : ''}). Received ${raw.length} bytes: ${
+        raw.slice(0, 400) || '(empty body)'
+      }`
+    )
   }
 
   return toAnthropicMessage(parts, finishReason)
@@ -229,7 +304,7 @@ async function listModels(apiKey: string): Promise<string[]> {
     return (data.models || [])
       .filter((m: any) => (m.supportedGenerationMethods || []).includes('generateContent'))
       .map((m: any) => String(m.name).replace(/^models\//, ''))
-      .slice(0, 12)
+      .slice(0, 30)
   } catch {
     return []
   }

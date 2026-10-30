@@ -33,9 +33,14 @@ const MAX_TOKENS = 4096
 const MODEL = 'claude-opus-5-5'
 
 // Gemini's free tier. Flash-class models are the ones with a usable free
-// quota; Pro is restricted or paid. Override with a GEMINI_MODEL var if this
-// id is not one your key can use — the worker will tell you which are.
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash'
+// quota; Pro is restricted or paid.
+//
+// Found by testing, not by reading docs: gemini-2.5-flash is retired for new
+// users, and gemini-flash-latest and gemini-3.8-flash both hung for 45s with
+// no response on a fresh free-tier key. gemini-3-flash-preview answered and
+// handled tool calls. If it is ever withdrawn, the worker lists the ids your
+// key can use in its error message - set GEMINI_MODEL to one of those.
+const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash-lite'
 
 function corsHeaders(origin: string | null, env: Env): Record<string, string> {
   const allowed = (env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean)
@@ -122,7 +127,7 @@ export default {
               thinking: { type: 'adaptive' },
               output_config: { effort: 'low' },
               system: typeof body.system === 'string' ? body.system : undefined,
-              messages: messages as Anthropic.MessageParam[],
+              messages: stripGeminiFields(messages) as Anthropic.MessageParam[],
               tools: Array.isArray(body.tools) ? (body.tools as Anthropic.Tool[]) : undefined,
             })
             for await (const event of stream) sse(controller, event)
@@ -146,6 +151,22 @@ export default {
       },
     })
   },
+}
+
+/** Gemini-only fields would make Anthropic's API reject the request. */
+function stripGeminiFields(messages: unknown[]): unknown[] {
+  return messages.map((m: any) =>
+    Array.isArray(m?.content)
+      ? {
+          ...m,
+          content: m.content.map((b: any) => {
+            if (b?.gemini_thought_signature === undefined) return b
+            const { gemini_thought_signature, ...rest } = b
+            return rest
+          }),
+        }
+      : m
+  )
 }
 
 function json(data: unknown, status: number, cors: Record<string, string>) {
