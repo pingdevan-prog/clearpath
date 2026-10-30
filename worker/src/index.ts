@@ -19,6 +19,12 @@ export interface Env {
 
 // One request may run a few tool rounds; this caps what any single turn costs.
 const MAX_TOKENS = 4096
+
+// Which model answers. Per million tokens, input / output / cached input:
+//   claude-opus-5-5    $4.00 / $20.00 / $0.20   best reasoning
+//   claude-sonnet-5-5  $2.00 / $10.00 / $0.20   most of the quality, half the price
+//   claude-haiku-5-5   $0.10 /  $0.50 / $0.20   ~40x cheaper in, weaker on open questions
+// Change this one line to move between them.
 const MODEL = 'claude-opus-5-5'
 
 function corsHeaders(origin: string | null, env: Env): Record<string, string> {
@@ -76,6 +82,11 @@ export default {
       const stream = client.messages.stream({
         model: MODEL,
         max_tokens: MAX_TOKENS,
+        // The system prompt and the six tool definitions are ~2,000 tokens and
+        // byte-identical on every request, and a tool round re-sends the whole
+        // conversation. Caching the prefix drops those repeats from $4 to
+        // $0.20 per million tokens, which is most of what a chat costs.
+        cache_control: { type: 'ephemeral' },
         // Adaptive thinking at low effort: this is a chat advisor, and the
         // hard reasoning (prerequisites, credits) is done by the tools.
         thinking: { type: 'adaptive' },
