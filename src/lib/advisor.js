@@ -17,7 +17,7 @@ import { REQUIREMENTS, bucketFor, tallyCredits } from '../data/graduation'
 import { GOAL_MAP, INTEREST_MAP, RIGOR_MAP } from '../data/pathways'
 import { CORE, LANGUAGE_FAMILIES, MATH_LADDER } from '../data/sequences'
 import { MIN_REVIEWS } from './metrics'
-import { buildNameIndex, coursesNamedIn, creditsOf } from './plan'
+import { buildNameIndex, coursesNamedIn, creditsOf, prereqSatisfiedBy } from './plan'
 import { PLAN_GRADES } from './store'
 
 // A full year at Westlake is 7 periods; 6.5 credits leaves room for a free
@@ -159,42 +159,14 @@ function fmtCredits(n) {
   return Number.isInteger(n) ? `${n} credit${n === 1 ? '' : 's'}` : `${String(n).replace(/^0/, '')} credits`
 }
 
-/**
- * The course under its level. "English I Honors" and "English I" are the same
- * rung, so taking the honours one has to satisfy a prerequisite that names the
- * on-level one — otherwise every honours student looks unqualified for the
- * next course in their own sequence.
- */
-function baseName(name) {
-  return name
-    .toLowerCase()
-    .replace(/\s*\(.*?\)\s*/g, ' ')
-    .replace(/\b(ap|honors|honours|advanced|dual credit|pre-ap|preap|gt)\b/g, ' ')
-    .replace(/[^a-z0-9 ]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
 /** Is this course's prerequisite satisfied by something in an earlier year? */
 function prereqMet(course, grade, placed, index, opts = {}) {
-  const named = coursesNamedIn(course.prereq, index)
-  if (!named.length) return { ok: true }
+  const result = prereqSatisfiedBy(course, grade, (id) => placed.get(id) ?? null, index, COURSE_MAP)
+  if (result.ok) return result
 
-  const earlierBases = new Set()
-  for (const [id, g] of placed) {
-    if (g < grade && COURSE_MAP[id]) earlierBases.add(baseName(COURSE_MAP[id].name))
-  }
-
-  for (const n of named) {
-    const at = placed.get(n.id)
-    if (at != null && at < grade) return { ok: true, via: n }
-    // Same rung, different level.
-    if (earlierBases.has(baseName(n.name))) return { ok: true, via: n }
-  }
-
-  // Core sequences: any earlier course in the same subject counts. This is how
-  // Dual Credit English leads into AP English Literature, which no amount of
-  // string matching on the catalog's prose would ever work out.
+  // Core sequences only: any earlier course in the same subject counts. This
+  // is how Dual Credit English leads into AP English Literature, which no
+  // amount of string matching on the catalog's prose would work out.
   if (opts.sameBucketCounts) {
     const bucket = bucketFor(course)
     for (const [id, g] of placed) {
@@ -203,8 +175,7 @@ function prereqMet(course, grade, placed, index, opts = {}) {
       }
     }
   }
-
-  return { ok: false, needs: named[0] }
+  return result
 }
 
 function gradeOk(course, grade) {

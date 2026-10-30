@@ -45,7 +45,7 @@ export function PlanView({
   const totalWarnings = useMemo(
     () =>
       PLAN_GRADES.reduce(
-        (n, g) => n + planned[g].reduce((m, c) => m + warningsFor(c, g, plan, index).length, 0),
+        (n, g) => n + planned[g].reduce((m, c) => m + warningsFor(c, g, plan, index, courseMap).length, 0),
         0
       ),
     [planned, plan, index]
@@ -154,6 +154,7 @@ export function PlanView({
             courses={planned[grade]}
             plan={plan}
             index={index}
+            courseMap={courseMap}
             statsByCourse={statsByCourse}
             onAdd={() => setPicking(grade)}
             onRemove={(id) => onRemove(grade, id)}
@@ -251,7 +252,7 @@ function CreditSummary({ tally, warnings, planned }) {
   )
 }
 
-function YearColumn({ grade, courses, plan, index, statsByCourse, onAdd, onRemove, onMove, onOpenCourse }) {
+function YearColumn({ grade, courses, plan, index, courseMap, statsByCourse, onAdd, onRemove, onMove, onOpenCourse }) {
   const credits = courses.reduce((n, c) => n + creditsOf(c), 0)
   return (
     <section className="card flex flex-col p-4">
@@ -271,7 +272,7 @@ function YearColumn({ grade, courses, plan, index, statsByCourse, onAdd, onRemov
             key={course.id}
             course={course}
             grade={grade}
-            warnings={warningsFor(course, grade, plan, index)}
+            warnings={warningsFor(course, grade, plan, index, courseMap)}
             stats={statsByCourse[course.id]}
             onRemove={() => onRemove(course.id)}
             onMove={(to) => onMove(course.id, to)}

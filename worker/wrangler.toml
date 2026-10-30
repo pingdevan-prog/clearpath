@@ -1,0 +1,22 @@
+# Cloudflare Worker that holds the Anthropic API key for Clearpath's advisor.
+#
+# The key never reaches the browser. The browser sends a conversation, the
+# worker adds the key and the model settings, and streams Claude's reply back.
+#
+# Deploy:
+#   npx wrangler login
+#   npx wrangler secret put ANTHROPIC_API_KEY
+#   npx wrangler deploy
+
+name = "clearpath-advisor"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[vars]
+# Only these origins may call the worker. Anything else is refused, so the
+# worker cannot be used as somebody else's free Claude proxy.
+ALLOWED_ORIGINS = "https://pingdevan-prog.github.io,http://localhost:5190,http://127.0.0.1:5190"

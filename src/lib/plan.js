@@ -46,10 +46,89 @@ export function coursesNamedIn(prereq, index) {
 }
 
 /**
+ * A course name with its level stripped off.
+ *
+ * "English I Honors" and "English I" are the same rung of the same sequence,
+ * and "AP World History" is the course "World History" names as its
+ * prerequisite. Matching on the bare name is what stops the planner telling a
+ * student who took English I Honors that they are missing English I.
+ */
+function stripLevels(s) {
+  return s
+    .toLowerCase()
+    .replace(/\b(ap|honors|honours|advanced|dual credit|pre-ap|preap|gt)\b/g, ' ')
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Every name a course answers to, with its level stripped off.
+ *
+ * "English I Honors" and "English I" are the same rung, and "AP World History"
+ * is what "World History" means in a prerequisite. The parenthetical counts
+ * too: "AP Language and Composition (AP English III)" IS English III, and the
+ * catalog only says so inside the brackets.
+ */
+export function baseNames(name) {
+  const out = new Set()
+  out.add(stripLevels(name.replace(/\s*\(.*?\)\s*/g, ' ')))
+  for (const m of name.matchAll(/\(([^)]+)\)/g)) {
+    const inner = stripLevels(m[1])
+    if (inner.length >= 4) out.add(inner)
+  }
+  out.delete('')
+  return out
+}
+
+/** The primary name, for callers that want a single string. */
+export function baseName(name) {
+  return stripLevels(name.replace(/\s*\(.*?\)\s*/g, ' '))
+}
+
+/**
+ * Is `course`'s prerequisite met by something scheduled before `grade`?
+ *
+ * `courseAt(id)` returns the grade a course is scheduled in, or null.
+ * Returns { ok, via, sameYear } so callers can tell "not taken" from
+ * "taken, but in the same year".
+ */
+export function prereqSatisfiedBy(course, grade, courseAt, index, courseMap) {
+  const named = coursesNamedIn(course.prereq, index)
+  if (!named.length) return { ok: true }
+
+  const earlierBases = new Set()
+  const sameYearBases = new Set()
+  for (const entry of index) {
+    const at = courseAt(entry.id)
+    if (at == null) continue
+    const names = baseNames(courseMap?.[entry.id]?.name || entry.name)
+    for (const b of names) {
+      if (at < grade) earlierBases.add(b)
+      else if (at === grade) sameYearBases.add(b)
+    }
+  }
+  const shares = (set, n) => [...baseNames(n.name)].some((b) => set.has(b))
+
+  for (const n of named) {
+    const at = courseAt(n.id)
+    if (at != null && at < grade) return { ok: true, via: n }
+    if (shares(earlierBases, n)) return { ok: true, via: n }
+  }
+  for (const n of named) {
+    const at = courseAt(n.id)
+    if ((at != null && at === grade) || shares(sameYearBases, n)) {
+      return { ok: false, sameYear: n }
+    }
+  }
+  return { ok: false, needs: named[0] }
+}
+
+/**
  * What to flag on one planned course: a grade the catalog does not open it to,
  * and prerequisites that are not scheduled in an earlier year.
  */
-export function warningsFor(course, grade, plan, index) {
+export function warningsFor(course, grade, plan, index, courseMap) {
   const warnings = []
 
   if (course.grades?.length && !course.grades.includes(grade)) {
@@ -60,27 +139,21 @@ export function warningsFor(course, grade, plan, index) {
     warnings.push({ kind: 'grade', text: `Catalog opens this to ${range}` })
   }
 
-  const named = coursesNamedIn(course.prereq, index)
-  if (named.length) {
-    const earlier = new Set()
-    const sameYear = new Set()
+  const at = (id) => {
     for (const g of PLAN_GRADES) {
-      for (const id of plan[g]) {
-        if (g < grade) earlier.add(id)
-        else if (g === grade) sameYear.add(id)
-      }
+      if ((plan[g] || []).includes(id)) return g
     }
-    const met = named.some((n) => earlier.has(n.id))
-    if (!met) {
-      const concurrent = named.find((n) => sameYear.has(n.id))
-      if (concurrent) {
-        warnings.push({ kind: 'prereq', text: `${concurrent.name} is scheduled the same year` })
-      } else {
-        warnings.push({
-          kind: 'prereq',
-          text: `Needs ${named[0].name} first, and it is not in an earlier year`,
-        })
-      }
+    return null
+  }
+  const result = prereqSatisfiedBy(course, grade, at, index, courseMap)
+  if (!result.ok) {
+    if (result.sameYear) {
+      warnings.push({ kind: 'prereq', text: `${result.sameYear.name} is scheduled the same year` })
+    } else if (result.needs) {
+      warnings.push({
+        kind: 'prereq',
+        text: `Needs ${result.needs.name} first, and it is not in an earlier year`,
+      })
     }
   }
 
