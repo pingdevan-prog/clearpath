@@ -94,12 +94,19 @@ export function baseName(name) {
  * "taken, but in the same year".
  */
 export function prereqSatisfiedBy(course, grade, courseAt, index, courseMap) {
-  const named = coursesNamedIn(course.prereq, index)
+  // A course is never its own prerequisite. Some catalog entries mention their
+  // own name in the prerequisite text ("If a student took ... AP Chemistry"),
+  // and without this a class gets flagged for needing itself.
+  const ownNames = baseNames(course.name)
+  const named = coursesNamedIn(course.prereq, index).filter(
+    (n) => n.id !== course.id && ![...baseNames(n.name)].some((b) => ownNames.has(b))
+  )
   if (!named.length) return { ok: true }
 
   const earlierBases = new Set()
   const sameYearBases = new Set()
   for (const entry of index) {
+    if (entry.id === course.id) continue
     const at = courseAt(entry.id)
     if (at == null) continue
     const names = baseNames(courseMap?.[entry.id]?.name || entry.name)
@@ -125,8 +132,13 @@ export function prereqSatisfiedBy(course, grade, courseAt, index, courseMap) {
 }
 
 /**
- * What to flag on one planned course: a grade the catalog does not open it to,
- * and prerequisites that are not scheduled in an earlier year.
+ * Light notes on one planned course: a grade the catalog does not list it for,
+ * and a prerequisite that is not in an earlier year.
+ *
+ * These are notes, not errors. A student can plan any class in any year —
+ * maybe they took the prerequisite over the summer, maybe a counsellor will
+ * make an exception — so the planner mentions it once, quietly, and never
+ * blocks anything.
  */
 export function warningsFor(course, grade, plan, index, courseMap) {
   const warnings = []
@@ -136,7 +148,7 @@ export function warningsFor(course, grade, plan, index, courseMap) {
       course.grades.length === 1
         ? `grade ${course.grades[0]}`
         : `grades ${course.grades[0]}–${course.grades[course.grades.length - 1]}`
-    warnings.push({ kind: 'grade', text: `Catalog opens this to ${range}` })
+    warnings.push({ kind: 'grade', text: `The catalog lists this for ${range}` })
   }
 
   const at = (id) => {
@@ -148,12 +160,12 @@ export function warningsFor(course, grade, plan, index, courseMap) {
   const result = prereqSatisfiedBy(course, grade, at, index, courseMap)
   if (!result.ok) {
     if (result.sameYear) {
-      warnings.push({ kind: 'prereq', text: `${result.sameYear.name} is scheduled the same year` })
-    } else if (result.needs) {
       warnings.push({
         kind: 'prereq',
-        text: `Needs ${result.needs.name} first, and it is not in an earlier year`,
+        text: `Usually taken after ${result.sameYear.name}, which you have the same year`,
       })
+    } else if (result.needs) {
+      warnings.push({ kind: 'prereq', text: `Usually taken after ${result.needs.name}` })
     }
   }
 

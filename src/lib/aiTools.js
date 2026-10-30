@@ -15,7 +15,7 @@ import { COURSES, COURSE_MAP } from '../data/courses'
 import { REQUIREMENTS, tallyCredits } from '../data/graduation'
 import { GOALS, INTERESTS, RIGOR } from '../data/pathways'
 import { buildPlan, rankCourses } from './advisor'
-import { baseNames, buildNameIndex, coursesNamedIn, creditsOf } from './plan'
+import { baseNames, buildNameIndex, coursesNamedIn, creditsOf, warningsFor } from './plan'
 import { MIN_REVIEWS } from './metrics'
 import { PLAN_GRADES } from './store'
 
@@ -76,7 +76,7 @@ export const TOOLS = [
   {
     name: 'get_my_plan',
     description:
-      "The student's current four year plan, their grade and role, credits so far, and which graduation requirements are still short. Call this before giving any advice that depends on what they have already chosen.",
+      "The student's current four year plan, their grade and role, and credits planned so far per graduation requirement. Call this before giving any advice that depends on what they have already chosen.",
     input_schema: { type: 'object', properties: {}, additionalProperties: false },
   },
   {
@@ -109,6 +109,30 @@ export const TOOLS = [
         limit: { type: 'integer', minimum: 1, maximum: 15 },
       },
       required: ['by'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'add_to_plan',
+    description:
+      "Add one class to the student's four year plan, in the grade they choose. Use this whenever the student asks to add a class or agrees to one you suggested. It always adds the class, even if a prerequisite is not in an earlier year; in that case the result includes a short note you can mention in passing. If the student did not say which grade, use their current grade, or ask.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        course_name: { type: 'string', description: 'The class, as named in the catalog' },
+        course_id: { type: 'string' },
+        grade: { type: 'integer', minimum: 9, maximum: 12, description: 'Which year to put it in' },
+      },
+      required: ['grade'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'remove_from_plan',
+    description: "Take one class out of the student's four year plan. Use only when the student asks.",
+    input_schema: {
+      type: 'object',
+      properties: { course_name: { type: 'string' }, course_id: { type: 'string' } },
       additionalProperties: false,
     },
   },
@@ -192,7 +216,8 @@ function brief(course, stats) {
  * student's plan and their profile.
  */
 export function runTool(name, input, ctx) {
-  const { statsByCourse, plan, profile } = ctx
+  const { statsByCourse, profile } = ctx
+  const plan = ctx.plan
 
   switch (name) {
     case 'search_courses': {
@@ -261,11 +286,14 @@ export function runTool(name, input, ctx) {
         },
         plan: byYear,
         credits_planned: tally.total,
-        credits_required: 26,
-        still_short: REQUIREMENTS.filter((r) => (tally.byBucket[r.key] || 0) < r.credits).map((r) => ({
+        credits_to_graduate: 26,
+        // Plain numbers. A plan in progress is not a problem, so nothing here
+        // is labelled "short" or "missing" - the model only talks about gaps
+        // when the student asks whether they are on track.
+        credits_by_requirement: REQUIREMENTS.map((r) => ({
           requirement: r.label,
-          have: tally.byBucket[r.key] || 0,
-          need: r.credits,
+          planned: tally.byBucket[r.key] || 0,
+          to_graduate: r.credits,
         })),
       }
     }
@@ -292,7 +320,6 @@ export function runTool(name, input, ctx) {
           ])
         ),
         total_credits: result.tally.total,
-        requirements_still_short: result.gaps.map((g) => `${g.label} (${g.short})`),
         kept_from_existing: result.kept,
         added: result.added.length,
         // The UI renders an "Use this plan" button from this.
@@ -364,6 +391,50 @@ export function runTool(name, input, ctx) {
         named_courses: needs.map((n) => ({ name: n.name, in_your_plan: whereIs(n) })),
         open_to_grades: course.grades.length ? course.grades : 'not listed',
         unlocks: unlocks.slice(0, 10).map((c) => c.name),
+      }
+    }
+
+    case 'add_to_plan': {
+      const course = resolveCourse(input)
+      if (!course) return { error: 'No course in this catalog matches that. Try search_courses first.' }
+      const grade = Number(input.grade)
+      if (![9, 10, 11, 12].includes(grade)) return { error: 'grade must be 9, 10, 11 or 12' }
+      if (!ctx.onAddToPlan) return { error: 'Adding classes is not available here.' }
+
+      const before = PLAN_GRADES.find((g) => (plan?.[g] || []).includes(course.id))
+      // Same move the plan screen makes: a class sits in one year at a time.
+      const next = Object.fromEntries(
+        PLAN_GRADES.map((g) => [g, (plan?.[g] || []).filter((id) => id !== course.id)])
+      )
+      next[grade] = [...next[grade], course.id]
+      ctx.onAddToPlan(grade, course.id)
+      ctx.plan = next // later tool calls in this answer see the change
+
+      const index = buildNameIndex(COURSES)
+      const notes = warningsFor(course, grade, next, index, COURSE_MAP).map((w) => w.text)
+      return {
+        added: course.name,
+        grade,
+        ...(before && before !== grade ? { moved_from_grade: before } : {}),
+        credits: creditsOf(course),
+        // Mention in passing if at all. Never refuse, never lecture.
+        light_note: notes.length ? notes.join('. ') : null,
+        _render: { type: 'added', courseId: course.id, name: course.name, grade, note: notes[0] || null },
+      }
+    }
+
+    case 'remove_from_plan': {
+      const course = resolveCourse(input)
+      if (!course) return { error: 'No course in this catalog matches that.' }
+      const grade = PLAN_GRADES.find((g) => (plan?.[g] || []).includes(course.id))
+      if (!grade) return { error: `${course.name} is not in the plan.` }
+      if (!ctx.onRemoveFromPlan) return { error: 'Removing classes is not available here.' }
+      ctx.onRemoveFromPlan(grade, course.id)
+      ctx.plan = { ...plan, [grade]: (plan[grade] || []).filter((id) => id !== course.id) }
+      return {
+        removed: course.name,
+        from_grade: grade,
+        _render: { type: 'removed', courseId: course.id, name: course.name, grade },
       }
     }
 

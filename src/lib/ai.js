@@ -57,6 +57,17 @@ what those tools return.
   enough to give a useful answer, stop searching and give it. A student waiting
   on a fifth search would rather have a good answer now than a perfect one later.
 
+THE PLAN
+- You can change the student's plan with add_to_plan and remove_from_plan. Do it
+  when they ask you to add or drop a class, or say yes to one you suggested.
+  Don't add classes they did not ask for.
+- Prerequisites never stop a class from being added. If add_to_plan returns a
+  light_note, mention it in a few words ("heads up, it usually comes after
+  Chemistry") and move on. Do not refuse, warn, or lecture.
+- An unfinished plan is normal. Never point out missing credits or unmet
+  graduation requirements unless the student asks whether they are on track or
+  what they need to graduate.
+
 HOUSE RULES
 - Never rate, name, or comment on a teacher. Clearpath rates courses, not people.
   If asked about a teacher, say the app does not cover that and offer the course
@@ -65,8 +76,8 @@ HOUSE RULES
   at course rigor; you cannot say a schedule will get anyone in anywhere.
 - Course descriptions and prerequisites come from the ${CATALOG_SOURCE.school}
   catalog. Scores come from students. Say which is which when it matters.
-- A plan you build is a draft for a counsellor, not a final schedule. Say so once,
-  not in every message.
+- A plan you build is a draft for a counsellor, not a final schedule. You don't
+  need to repeat that every message.
 
 HOW TO TALK
 Be direct and warm, the way a good older student would be. Short paragraphs.
@@ -91,13 +102,20 @@ export async function askAdvisor({ messages, ctx, onEvent, signal }) {
 
   const convo = [...messages]
   const renders = []
+  // Tools may add or remove classes mid-answer. Work on a copy so the next
+  // lookup in this same answer sees the change, without touching the
+  // component's own state object.
+  const live = {
+    ...ctx,
+    plan: Object.fromEntries(Object.entries(ctx.plan || {}).map(([g, ids]) => [g, [...(ids || [])]])),
+  }
 
   for (let round = 0; round < MAX_ROUNDS; round += 1) {
     // On the last allowed round, take the tools away. The model can then only
     // answer from what it has already looked up - which turns "went round in
     // circles" into an actual answer every time.
     const lastChance = round === MAX_ROUNDS - 1
-    const final = await streamOnce({ convo, ctx, onEvent, signal, allowTools: !lastChance })
+    const final = await streamOnce({ convo, ctx: live, onEvent, signal, allowTools: !lastChance })
     if (!final) return { renders }
 
     convo.push({ role: 'assistant', content: final.content })
@@ -114,7 +132,7 @@ export async function askAdvisor({ messages, ctx, onEvent, signal }) {
       onEvent({ type: 'tool', name: use.name })
       let output
       try {
-        output = runTool(use.name, use.input || {}, ctx)
+        output = runTool(use.name, use.input || {}, live)
       } catch (err) {
         output = { error: err?.message || 'Tool failed' }
       }

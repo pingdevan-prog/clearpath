@@ -115,6 +115,8 @@ export function PlanView({
             profile={profile}
             school={school}
             onApplyPlan={onApplyPlan}
+            onAddToPlan={onAdd}
+            onRemoveFromPlan={onRemove}
             onOpenCourse={onOpenCourse}
             onClose={() => setAdvisorOpen(false)}
           />
@@ -209,12 +211,10 @@ function CreditSummary({ tally, warnings, planned }) {
           {planned === 0 ? (
             <span className="text-[13px] text-muted">Nothing planned yet</span>
           ) : warnings > 0 ? (
-            <span className="text-[13px] font-semibold text-scale-7">
-              {warnings} thing{warnings === 1 ? '' : 's'} to check
+            <span className="text-[12.5px] text-muted">
+              {warnings} prerequisite {warnings === 1 ? 'note' : 'notes'}
             </span>
-          ) : (
-            <span className="text-[13px] font-semibold text-good">Nothing flagged</span>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -378,12 +378,9 @@ function PlannedCourse({ course, grade, warnings, stats, onRemove, onMove, onOpe
       {warnings.map((w) => (
         <div
           key={w.text}
-          className="mt-2 flex items-start gap-1.5 rounded-lg bg-warn-soft px-2 py-1.5 text-[11.5px] leading-snug text-warn"
+          className="cp-plan-note mt-1.5 flex items-start gap-1.5 text-[11.5px] leading-snug text-muted"
         >
-          <svg viewBox="0 0 20 20" className="mt-px h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M10 6.5v4.5M10 13.8v.2" strokeLinecap="round" />
-            <circle cx="10" cy="10" r="7.5" />
-          </svg>
+          <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-scale-6/70" aria-hidden />
           {w.text}
         </div>
       ))}

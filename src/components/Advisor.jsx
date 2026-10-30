@@ -13,7 +13,17 @@ import { LevelPill } from './Bits'
  * answers in the only currency that matters here: real courses, with the
  * reason each one was picked.
  */
-export function Advisor({ statsByCourse, plan, profile, school, onApplyPlan, onOpenCourse, onClose }) {
+export function Advisor({
+  statsByCourse,
+  plan,
+  profile,
+  school,
+  onApplyPlan,
+  onAddToPlan,
+  onRemoveFromPlan,
+  onOpenCourse,
+  onClose,
+}) {
   const [messages, setMessages] = useState([
     {
       from: 'bot',
@@ -35,8 +45,8 @@ export function Advisor({ statsByCourse, plan, profile, school, onApplyPlan, onO
   }, [messages, thinking])
 
   const ctx = useMemo(
-    () => ({ statsByCourse, plan, profile, prefs }),
-    [statsByCourse, plan, profile, prefs]
+    () => ({ statsByCourse, plan, profile, prefs, school, onAddToPlan, onRemoveFromPlan }),
+    [statsByCourse, plan, profile, prefs, school, onAddToPlan, onRemoveFromPlan]
   )
 
   // The conversation as the model sees it, kept alongside the rendered one.
@@ -73,6 +83,7 @@ export function Advisor({ statsByCourse, plan, profile, school, onApplyPlan, onO
     // One streaming bubble that fills in as the answer arrives.
     let streamed = ''
     let index = -1
+    const changes = []
     setMessages((m) => {
       index = m.length
       return [...m, { from: 'bot', text: '', streaming: true }]
@@ -93,6 +104,9 @@ export function Advisor({ statsByCourse, plan, profile, school, onApplyPlan, onO
             update({ tool: TOOL_LABELS[e.name] || 'Looking it up' })
           } else if (e.type === 'render' && e.payload?.type === 'plan') {
             update({ plan: e.payload.plan })
+          } else if (e.type === 'render' && (e.payload?.type === 'added' || e.payload?.type === 'removed')) {
+            changes.push(e.payload)
+            update({ changes: [...changes] })
           } else if (e.type === 'done') {
             update({ streaming: false, tool: null })
           } else if (e.type === 'error') {
@@ -159,6 +173,8 @@ export function Advisor({ statsByCourse, plan, profile, school, onApplyPlan, onO
             key={i}
             message={m}
             onApplyPlan={onApplyPlan}
+            onAddToPlan={onAddToPlan}
+            onRemoveFromPlan={onRemoveFromPlan}
             onOpenCourse={onOpenCourse}
             onChip={send}
           />
@@ -274,7 +290,7 @@ function PrefsBar({ prefs }) {
   )
 }
 
-function Message({ message, onApplyPlan, onOpenCourse, onChip }) {
+function Message({ message, onApplyPlan, onAddToPlan, onRemoveFromPlan, onOpenCourse, onChip }) {
   if (message.from === 'me') {
     return (
       <div className="flex justify-end">
@@ -312,6 +328,23 @@ function Message({ message, onApplyPlan, onOpenCourse, onChip }) {
           {message.streaming && message.text && (
             <span className="ml-0.5 inline-block h-3.5 w-[2px] animate-pulse bg-ink-2 align-middle" />
           )}
+        </div>
+      )}
+
+      {message.changes?.length > 0 && (
+        <div className="space-y-1.5">
+          {message.changes.map((c, i) => (
+            <PlanChange
+              key={`${c.type}-${c.courseId}-${i}`}
+              change={c}
+              onUndo={() =>
+                c.type === 'added'
+                  ? onRemoveFromPlan?.(c.grade, c.courseId)
+                  : onAddToPlan?.(c.grade, c.courseId)
+              }
+              onOpen={() => onOpenCourse(c.courseId)}
+            />
+          ))}
         </div>
       )}
 
@@ -400,6 +433,50 @@ function CourseLine({ course, detail, onOpen }) {
         )}
       </span>
     </button>
+  )
+}
+
+/** "Added AP Chemistry to 11th grade", with an undo. */
+function PlanChange({ change, onUndo, onOpen }) {
+  const [undone, setUndone] = useState(false)
+  const added = change.type === 'added'
+  return (
+    <div className="flex items-start gap-2.5 rounded-xl border border-line bg-surface px-3 py-2.5">
+      <span
+        className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full ${
+          undone ? 'bg-sunk text-muted' : added ? 'bg-good-soft text-good' : 'bg-sunk text-ink-2'
+        }`}
+        aria-hidden
+      >
+        <svg viewBox="0 0 20 20" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.6">
+          {added ? <path d="M10 5v10M5 10h10" strokeLinecap="round" /> : <path d="M5 10h10" strokeLinecap="round" />}
+        </svg>
+      </span>
+      <span className="min-w-0 flex-1 text-[13px] leading-snug">
+        <span className={undone ? 'text-muted line-through' : 'text-ink-2'}>
+          {added ? 'Added ' : 'Removed '}
+          <button type="button" onClick={onOpen} className="font-semibold text-ink hover:text-brand">
+            {change.name}
+          </button>
+          {added ? ` to ${change.grade}th grade` : ` from ${change.grade}th grade`}
+        </span>
+        {added && change.note && !undone && (
+          <span className="mt-0.5 block text-[11.5px] text-muted">{change.note}</span>
+        )}
+      </span>
+      {!undone && (
+        <button
+          type="button"
+          onClick={() => {
+            onUndo()
+            setUndone(true)
+          }}
+          className="shrink-0 text-[12px] font-semibold text-muted hover:text-brand"
+        >
+          Undo
+        </button>
+      )}
+    </div>
   )
 }
 

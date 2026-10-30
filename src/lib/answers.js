@@ -149,9 +149,6 @@ export function answer(text, ctx) {
         `Here is a four year plan ${bits.join(', ')}. ` +
         (result.kept ? `I kept the ${result.kept} ${result.kept === 1 ? 'class' : 'classes'} you already had and added ${result.added.length}. ` : '') +
         `It comes to ${result.tally.total} credits.` +
-        (result.gaps.length
-          ? ` Still short on ${result.gaps.map((g) => `${g.label} (${g.short})`).join(', ')}.`
-          : ' Every graduation requirement is covered.') +
         (prefs.collegeNote ? `\n\n${prefs.collegeNote}` : ''),
       plan: result,
       prefs,
@@ -169,21 +166,13 @@ export function answer(text, ctx) {
       }
     }
     const tally = tallyCredits(courses)
-    const short = REQUIREMENTS.filter((r) => (tally.byBucket[r.key] || 0) < r.credits)
     return {
       text:
-        `You have ${tally.total} credits planned out of 26.\n\n` +
-        (short.length
-          ? short
-              .map(
-                (r) =>
-                  `• ${r.label}: ${tally.byBucket[r.key] || 0} of ${r.credits} — ${
-                    Math.round((r.credits - (tally.byBucket[r.key] || 0)) * 10) / 10
-                  } short`
-              )
-              .join('\n')
-          : 'Every requirement is covered.') +
-        '\n\nThis is a rough check against the plan Westlake publishes. Your counsellor has the final word.',
+        `You have ${tally.total} of 26 credits planned so far.\n\n` +
+        REQUIREMENTS.map(
+          (r) => `• ${r.label}: ${tally.byBucket[r.key] || 0} of ${r.credits}`
+        ).join('\n') +
+        '\n\nThis is a rough count against the plan Westlake publishes. Your counsellor has the final word.',
     }
   }
 
