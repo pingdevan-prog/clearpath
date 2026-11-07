@@ -23,5 +23,9 @@ export const firebaseConfig = {
   appId: '1:372672134877:web:c4ec11f9fdbe11900de534',
 }
 
+// On the dev server only, `?local` in the address runs the app without sign-in,
+// so screens can be checked without a Google account. Builds ignore it.
+const LOCAL_PREVIEW = import.meta.env.DEV && new URLSearchParams(window.location.search).has('local')
+
 /** True once the config above is filled in. */
-export const HAS_FIREBASE = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId)
+export const HAS_FIREBASE = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId) && !LOCAL_PREVIEW

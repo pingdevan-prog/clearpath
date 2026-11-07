@@ -148,6 +148,7 @@ function SchoolSwitcher({ school, mySchools, onSwitch, onNavigate }) {
         className="flex items-center gap-2 rounded-full border border-line bg-surface py-1 pl-1 pr-2.5 transition-colors hover:border-brand/40"
       >
         <SchoolTile school={school} size={26} />
+        <span className="sr-only sm:hidden">{school.short}</span>
         <span className="hidden max-w-[9rem] truncate text-[13.5px] font-semibold text-ink sm:block">
           {school.short}
         </span>

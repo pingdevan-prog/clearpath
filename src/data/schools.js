@@ -1,3 +1,16 @@
+import westlakeLogo from '../assets/schools/westlake.webp'
+import lakeTravisLogo from '../assets/schools/lake-travis.webp'
+import austinHighLogo from '../assets/schools/austin-high.webp'
+import andersonLogo from '../assets/schools/anderson.webp'
+import bowieLogo from '../assets/schools/bowie.svg'
+import mccallumLogo from '../assets/schools/mccallum.svg'
+import westwoodLogo from '../assets/schools/westwood.webp'
+import roundRockLogo from '../assets/schools/round-rock.webp'
+import cedarParkLogo from '../assets/schools/cedar-park.webp'
+import vandegriftLogo from '../assets/schools/vandegrift.webp'
+import drippingSpringsLogo from '../assets/schools/dripping-springs.webp'
+import haysLogo from '../assets/schools/hays.webp'
+
 // ---------------------------------------------------------------------------
 // Schools you can add to your account.
 //
@@ -7,6 +20,10 @@
 // and so nobody gets a blank search screen.
 // ---------------------------------------------------------------------------
 
+// Each school's own mark, saved from its website and shrunk to a few kilobytes
+// so the single-file build can carry all of them. Full colour marks sit on a
+// white tile. The four schools that publish a white-only mark
+// get a tile in their school colour, the way their own sites show it.
 export const SCHOOLS = [
   {
     id: 'westlake',
@@ -16,20 +33,21 @@ export const SCHOOLS = [
     city: 'Austin, TX',
     mascot: 'Chaparrals',
     initials: 'WHS',
-    hue: '#0E6B4F',
+    hue: '#203090',
+    logo: westlakeLogo,
     catalog: true,
   },
-  { id: 'lake-travis', name: 'Lake Travis High School', short: 'Lake Travis', district: 'Lake Travis ISD', city: 'Austin, TX', mascot: 'Cavaliers', initials: 'LT', hue: '#1B3A8F', catalog: false },
-  { id: 'austin-high', name: 'Austin High School', short: 'Austin High', district: 'Austin ISD', city: 'Austin, TX', mascot: 'Maroons', initials: 'AHS', hue: '#7A1F33', catalog: false },
-  { id: 'anderson', name: 'Anderson High School', short: 'Anderson', district: 'Austin ISD', city: 'Austin, TX', mascot: 'Trojans', initials: 'AND', hue: '#1F4E79', catalog: false },
-  { id: 'bowie', name: 'Bowie High School', short: 'Bowie', district: 'Austin ISD', city: 'Austin, TX', mascot: 'Bulldogs', initials: 'BOW', hue: '#2B3A55', catalog: false },
-  { id: 'mccallum', name: 'McCallum High School', short: 'McCallum', district: 'Austin ISD', city: 'Austin, TX', mascot: 'Knights', initials: 'MAC', hue: '#5B2E86', catalog: false },
-  { id: 'westwood', name: 'Westwood High School', short: 'Westwood', district: 'Round Rock ISD', city: 'Austin, TX', mascot: 'Warriors', initials: 'WW', hue: '#0E5A6B', catalog: false },
-  { id: 'round-rock', name: 'Round Rock High School', short: 'Round Rock', district: 'Round Rock ISD', city: 'Round Rock, TX', mascot: 'Dragons', initials: 'RR', hue: '#8A4B10', catalog: false },
-  { id: 'cedar-park', name: 'Cedar Park High School', short: 'Cedar Park', district: 'Leander ISD', city: 'Cedar Park, TX', mascot: 'Timberwolves', initials: 'CP', hue: '#2F6B3A', catalog: false },
-  { id: 'vandegrift', name: 'Vandegrift High School', short: 'Vandegrift', district: 'Leander ISD', city: 'Austin, TX', mascot: 'Vipers', initials: 'VHS', hue: '#3A2F6B', catalog: false },
-  { id: 'dripping-springs', name: 'Dripping Springs High School', short: 'Dripping Springs', district: 'Dripping Springs ISD', city: 'Dripping Springs, TX', mascot: 'Tigers', initials: 'DS', hue: '#9A6B12', catalog: false },
-  { id: 'hays', name: 'Hays High School', short: 'Hays', district: 'Hays CISD', city: 'Buda, TX', mascot: 'Rebels', initials: 'HHS', hue: '#1D5C8A', catalog: false },
+  { id: 'lake-travis', name: 'Lake Travis High School', short: 'Lake Travis', district: 'Lake Travis ISD', city: 'Austin, TX', mascot: 'Cavaliers', initials: 'LT', hue: '#D22630', logo: lakeTravisLogo, logoOnColour: true, catalog: false },
+  { id: 'austin-high', name: 'Austin High School', short: 'Austin High', district: 'Austin ISD', city: 'Austin, TX', mascot: 'Maroons', initials: 'AHS', hue: '#4D0006', logo: austinHighLogo, logoOnColour: true, catalog: false },
+  { id: 'anderson', name: 'Anderson High School', short: 'Anderson', district: 'Austin ISD', city: 'Austin, TX', mascot: 'Trojans', initials: 'AND', hue: '#2B5597', logo: andersonLogo, logoOnColour: true, catalog: false },
+  { id: 'bowie', name: 'Bowie High School', short: 'Bowie', district: 'Austin ISD', city: 'Austin, TX', mascot: 'Bulldogs', initials: 'BOW', hue: '#CF0A2C', logo: bowieLogo, catalog: false },
+  { id: 'mccallum', name: 'McCallum High School', short: 'McCallum', district: 'Austin ISD', city: 'Austin, TX', mascot: 'Knights', initials: 'MAC', hue: '#2E4EA2', logo: mccallumLogo, logoOnColour: true, catalog: false },
+  { id: 'westwood', name: 'Westwood High School', short: 'Westwood', district: 'Round Rock ISD', city: 'Austin, TX', mascot: 'Warriors', initials: 'WW', hue: '#B06020', logo: westwoodLogo, catalog: false },
+  { id: 'round-rock', name: 'Round Rock High School', short: 'Round Rock', district: 'Round Rock ISD', city: 'Round Rock, TX', mascot: 'Dragons', initials: 'RR', hue: '#6B0F1A', logo: roundRockLogo, catalog: false },
+  { id: 'cedar-park', name: 'Cedar Park High School', short: 'Cedar Park', district: 'Leander ISD', city: 'Cedar Park, TX', mascot: 'Timberwolves', initials: 'CP', hue: '#005030', logo: cedarParkLogo, catalog: false },
+  { id: 'vandegrift', name: 'Vandegrift High School', short: 'Vandegrift', district: 'Leander ISD', city: 'Austin, TX', mascot: 'Vipers', initials: 'VHS', hue: '#1F2A44', logo: vandegriftLogo, catalog: false },
+  { id: 'dripping-springs', name: 'Dripping Springs High School', short: 'Dripping Springs', district: 'Dripping Springs ISD', city: 'Dripping Springs, TX', mascot: 'Tigers', initials: 'DS', hue: '#5A1220', logo: drippingSpringsLogo, catalog: false },
+  { id: 'hays', name: 'Hays High School', short: 'Hays', district: 'Hays CISD', city: 'Buda, TX', mascot: 'Hawks', initials: 'HHS', hue: '#C01020', logo: haysLogo, catalog: false },
 ]
 
 export const SCHOOL_MAP = Object.fromEntries(SCHOOLS.map((s) => [s.id, s]))

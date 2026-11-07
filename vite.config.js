@@ -14,6 +14,9 @@ export default defineConfig({
         inlineDynamicImports: true,
       },
     },
+    // Same reason: every image (the school logos) must be a data URI, never a
+    // separate file the single-file build would leave behind.
+    assetsInlineLimit: () => true,
     chunkSizeWarningLimit: 1600,
   },
 })

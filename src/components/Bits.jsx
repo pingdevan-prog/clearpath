@@ -203,6 +203,19 @@ export function Avatar({ profile, size = 40, className = '' }) {
 }
 
 export function SchoolTile({ school, size = 44, className = '' }) {
+  if (school.logo) {
+    const onColour = school.logoOnColour
+    return (
+      <span
+        className={`grid shrink-0 place-items-center overflow-hidden rounded-[13px] ${
+          onColour ? '' : 'bg-white ring-1 ring-inset ring-black/[0.07]'
+        } ${className}`}
+        style={{ height: size, width: size, padding: size * (onColour ? 0.18 : 0.1), background: onColour ? school.hue : undefined }}
+      >
+        <img src={school.logo} alt="" draggable={false} className="h-full w-full object-contain" />
+      </span>
+    )
+  }
   return (
     <span
       className={`grid shrink-0 place-items-center rounded-[13px] font-semibold text-white ${className}`}
