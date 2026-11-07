@@ -5,8 +5,8 @@ import { STARTERS, answer } from '../lib/answers'
 import { HAS_LLM, askAdvisor } from '../lib/ai'
 import { creditsOf } from '../lib/plan'
 import { PLAN_GRADES } from '../lib/store'
-import { deptHue, toneFor, verdictFor } from '../lib/metrics'
-import { LevelPill } from './Bits'
+import { toneFor, verdictFor } from '../lib/metrics'
+import { DeptBadge, Icon, LevelPill } from './Bits'
 
 /**
  * The advisor. Reads the student's plan, the catalog and every review, and
@@ -140,29 +140,23 @@ export function Advisor({
   useEffect(() => () => abortRef.current?.abort(), [])
 
   return (
-    <div className="card flex h-[32rem] flex-col overflow-hidden sm:h-[34rem]">
-      <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-        <div className="flex items-center gap-2.5">
+    <div className="card flex h-[34rem] animate-pop-in flex-col overflow-hidden sm:h-[36rem]">
+      <header className="flex items-center justify-between gap-3 border-b border-line bg-brand-wash/60 px-4 py-3">
+        <div className="flex items-center gap-3">
           <Spark />
           <div>
-            <h2 className="text-[15px] font-semibold leading-tight text-ink">Schedule advisor</h2>
-            <p className="text-[12px] leading-tight text-muted">
-              {HAS_LLM
-                ? 'Claude, reading your plan, the catalog and every review'
-                : 'Reads your plan, the catalog and every review'}
-            </p>
+            <h2 className="text-[15.5px] font-bold leading-tight text-ink">Schedule advisor</h2>
+            <p className="text-[12.5px] leading-tight text-muted">Reads your plan, the catalog and every review</p>
           </div>
         </div>
         {onClose && (
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1.5 text-muted hover:text-ink"
+            className="rounded-full p-1.5 text-muted transition-colors hover:bg-surface hover:text-ink"
             aria-label="Close advisor"
           >
-            <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M6 6l8 8M14 6l-8 8" strokeLinecap="round" />
-            </svg>
+            <Icon name="x" size={18} stroke={2.2} />
           </button>
         )}
       </header>
@@ -180,20 +174,16 @@ export function Advisor({
           />
         ))}
 
-        {messages.length === 1 && !HAS_LLM && (
+        {messages.length === 1 && (
           <div className="flex flex-wrap gap-2 pt-1">
-            {STARTERS.map((s) => (
-              <button key={s.label} type="button" onClick={() => send(s.text)} className="chip">
-                {s.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {messages.length === 1 && HAS_LLM && (
-          <div className="flex flex-wrap gap-2 pt-1">
-            {STARTERS.slice(0, 6).map((s) => (
-              <button key={s.label} type="button" onClick={() => send(s.text)} className="chip">
+            {(HAS_LLM ? STARTERS.slice(0, 6) : STARTERS).map((s, i) => (
+              <button
+                key={s.label}
+                type="button"
+                onClick={() => send(s.text)}
+                className="chip animate-rise-in"
+                style={{ animationDelay: `${120 + i * 45}ms` }}
+              >
                 {s.label}
               </button>
             ))}
@@ -205,7 +195,7 @@ export function Advisor({
             {[0, 1, 2].map((i) => (
               <span
                 key={i}
-                className="h-1.5 w-1.5 animate-pulse rounded-full bg-muted"
+                className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand"
                 style={{ animationDelay: `${i * 140}ms` }}
               />
             ))}
@@ -233,11 +223,11 @@ export function Advisor({
         <button
           type="submit"
           disabled={!input.trim() || thinking}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand text-white transition-colors hover:bg-brand-deep disabled:opacity-40"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-brand text-white shadow-glow transition-[background-color,transform,opacity] duration-200 hover:bg-brand-press active:scale-90 disabled:opacity-40 disabled:shadow-none"
           aria-label="Send"
         >
-          <svg viewBox="0 0 20 20" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M4 10h11M10.5 5l5 5-5 5" strokeLinecap="round" strokeLinejoin="round" />
+          <svg viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+            <path d="M10 16V4.5M5 9l5-5 5 5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
       </form>
@@ -257,10 +247,8 @@ const TOOL_LABELS = {
 
 function Spark() {
   return (
-    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-brand">
-      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="white" strokeWidth="2">
-        <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18" strokeLinecap="round" />
-      </svg>
+    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand text-white shadow-glow">
+      <Icon name="sparkle" size={18} stroke={2} />
     </span>
   )
 }
@@ -280,9 +268,9 @@ function PrefsBar({ prefs }) {
   if (!bits.length) return null
   return (
     <div className="flex flex-wrap items-center gap-1.5 border-t border-line bg-sunk/50 px-4 py-2">
-      <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted">Going on</span>
+      <span className="text-[12px] font-semibold text-muted">Going on</span>
       {bits.map((b) => (
-        <span key={b} className="rounded-full bg-surface px-2 py-0.5 text-[11.5px] font-medium text-ink-2">
+        <span key={b} className="rounded-full bg-surface px-2 py-0.5 text-[12px] font-medium text-ink-2">
           {b}
         </span>
       ))}
@@ -293,7 +281,7 @@ function PrefsBar({ prefs }) {
 function Message({ message, onApplyPlan, onAddToPlan, onRemoveFromPlan, onOpenCourse, onChip }) {
   if (message.from === 'me') {
     return (
-      <div className="flex justify-end">
+      <div className="flex animate-rise-in justify-end">
         <p className="max-w-[85%] rounded-2xl rounded-br-md bg-brand px-3.5 py-2.5 text-[14px] leading-relaxed text-white">
           {message.text}
         </p>
@@ -302,7 +290,7 @@ function Message({ message, onApplyPlan, onAddToPlan, onRemoveFromPlan, onOpenCo
   }
 
   return (
-    <div className="space-y-2.5">
+    <div className="animate-rise-in space-y-2.5">
       {message.tool && (
         <div className="flex items-center gap-2 px-1 text-[12.5px] text-muted">
           <span className="flex gap-1" aria-hidden>
@@ -332,7 +320,7 @@ function Message({ message, onApplyPlan, onAddToPlan, onRemoveFromPlan, onOpenCo
       )}
 
       {message.changes?.length > 0 && (
-        <div className="space-y-1.5">
+        <div className="max-w-[92%] space-y-0.5 rounded-2xl bg-sunk/70 p-1.5">
           {message.changes.map((c, i) => (
             <PlanChange
               key={`${c.type}-${c.courseId}-${i}`}
@@ -351,7 +339,7 @@ function Message({ message, onApplyPlan, onAddToPlan, onRemoveFromPlan, onOpenCo
       {message.plan && <PlanProposal plan={message.plan} onApply={onApplyPlan} onOpenCourse={onOpenCourse} />}
 
       {message.courses?.length > 0 && !message.plan && (
-        <div className="space-y-1.5">
+        <div className="max-w-[92%] space-y-0.5 rounded-2xl bg-sunk/70 p-1.5">
           {message.courses.map((c, i) => (
             <CourseLine
               key={c.id}
@@ -405,31 +393,29 @@ function CourseLine({ course, detail, onOpen }) {
     <button
       type="button"
       onClick={onOpen}
-      className="flex w-full items-start gap-2.5 rounded-xl border border-line bg-surface px-3 py-2.5 text-left transition-colors hover:border-brand/40 hover:bg-brand-wash"
+      className="group flex w-full items-start gap-2.5 rounded-xl px-2 py-2 text-left transition-colors hover:bg-surface"
     >
-      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: deptHue(course.dept) }} />
+      <DeptBadge dept={course.dept} size={30} />
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-1.5">
           <span className="text-[13.5px] font-semibold leading-snug text-ink">{course.name}</span>
           <LevelPill level={course.level} />
         </span>
         {rv && (
-          <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 text-[11.5px] text-muted">
-            <span style={{ color: toneFor('difficulty', rv.difficulty) }}>
+          <span className="mt-0.5 flex flex-wrap items-center gap-x-2.5 text-[12px] font-medium">
+            <span className="tone-text" style={{ '--tone': toneFor('difficulty', rv.difficulty) }}>
               Difficulty {rv.difficulty.toFixed(1)}
             </span>
-            <span style={{ color: toneFor('workload', rv.workload) }}>
+            <span className="tone-text" style={{ '--tone': toneFor('workload', rv.workload) }}>
               Homework {rv.workload.toFixed(1)}
             </span>
-            <span style={{ color: verdictFor(rv.takeAgain).tone }}>
+            <span className="tone-text" style={{ '--tone': verdictFor(rv.takeAgain).tone }}>
               {Math.round(rv.takeAgain * 100)}% retake
             </span>
           </span>
         )}
         {detail?.reasons?.length > 0 && (
-          <span className="mt-0.5 block text-[11.5px] leading-snug text-muted">
-            {detail.reasons[0]}
-          </span>
+          <span className="mt-0.5 block text-[12px] leading-snug text-muted">{detail.reasons[0]}</span>
         )}
       </span>
     </button>
@@ -441,10 +427,10 @@ function PlanChange({ change, onUndo, onOpen }) {
   const [undone, setUndone] = useState(false)
   const added = change.type === 'added'
   return (
-    <div className="flex items-start gap-2.5 rounded-xl border border-line bg-surface px-3 py-2.5">
+    <div className="flex animate-rise-in items-start gap-2.5 rounded-xl px-2 py-2">
       <span
-        className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full ${
-          undone ? 'bg-sunk text-muted' : added ? 'bg-good-soft text-good' : 'bg-sunk text-ink-2'
+        className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full transition-colors ${
+          undone ? 'bg-line text-muted' : added ? 'bg-good text-white' : 'bg-ink/10 text-ink-2'
         }`}
         aria-hidden
       >
@@ -455,13 +441,13 @@ function PlanChange({ change, onUndo, onOpen }) {
       <span className="min-w-0 flex-1 text-[13px] leading-snug">
         <span className={undone ? 'text-muted line-through' : 'text-ink-2'}>
           {added ? 'Added ' : 'Removed '}
-          <button type="button" onClick={onOpen} className="font-semibold text-ink hover:text-brand">
+          <button type="button" onClick={onOpen} className="font-semibold text-ink transition-colors hover:text-brand-ink">
             {change.name}
           </button>
           {added ? ` to ${change.grade}th grade` : ` from ${change.grade}th grade`}
         </span>
         {added && change.note && !undone && (
-          <span className="mt-0.5 block text-[11.5px] text-muted">{change.note}</span>
+          <span className="mt-0.5 block text-[12px] text-muted">{change.note}</span>
         )}
       </span>
       {!undone && (
@@ -471,7 +457,7 @@ function PlanChange({ change, onUndo, onOpen }) {
             onUndo()
             setUndone(true)
           }}
-          className="shrink-0 text-[12px] font-semibold text-muted hover:text-brand"
+          className="shrink-0 rounded-full px-2 py-0.5 text-[12.5px] font-semibold text-brand-ink transition-colors hover:bg-brand-soft"
         >
           Undo
         </button>
@@ -489,18 +475,16 @@ function PlanProposal({ plan, onApply, onOpenCourse }) {
   }))
 
   return (
-    <div className="rounded-2xl border border-brand/30 bg-brand-wash/60 p-3">
+    <div className="animate-rise-in rounded-2xl border border-brand/20 bg-brand-wash p-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[12px] font-semibold uppercase tracking-[0.1em] text-brand-deep">
-          Proposed plan
-        </span>
-        <span className="tnum text-[12px] text-muted">{plan.tally.total} credits</span>
+        <h3 className="text-[14.5px] font-bold text-brand-deep">Proposed plan</h3>
+        <span className="tnum text-[12.5px] text-muted">{plan.tally.total} credits</span>
       </div>
 
       <div className="mt-2.5 space-y-2.5">
         {byGrade.map(({ grade, courses, reasons }) => (
           <div key={grade}>
-            <div className="text-[11.5px] font-semibold text-ink-2">
+            <div className="text-[12px] font-semibold text-ink-2">
               {grade}th · {courses.reduce((n, c) => n + creditsOf(c), 0)} credits
             </div>
             <div className="mt-1 space-y-1">
@@ -509,16 +493,13 @@ function PlanProposal({ plan, onApply, onOpenCourse }) {
                   key={c.id}
                   type="button"
                   onClick={() => onOpenCourse(c.id)}
-                  className="flex w-full items-baseline gap-2 rounded-lg px-1.5 py-1 text-left hover:bg-surface"
+                  className="flex w-full items-start gap-2 rounded-lg px-1.5 py-1 text-left transition-colors hover:bg-surface"
                 >
-                  <span
-                    className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full"
-                    style={{ background: deptHue(c.dept) }}
-                  />
+                  <DeptBadge dept={c.dept} size={22} className="mt-px" />
                   <span className="min-w-0 flex-1">
                     <span className="text-[13px] font-medium leading-snug text-ink">{c.name}</span>
                     {reasons[c.id] && (
-                      <span className="block text-[11px] leading-snug text-muted">{reasons[c.id]}</span>
+                      <span className="block text-[12px] leading-snug text-muted">{reasons[c.id]}</span>
                     )}
                   </span>
                 </button>
@@ -537,10 +518,11 @@ function PlanProposal({ plan, onApply, onOpenCourse }) {
         }}
         className="btn-primary mt-3 w-full py-2.5 text-[14px]"
       >
+        {applied && <Icon name="check" size={17} stroke={2.6} className="animate-pop-in" />}
         {applied ? 'Added to your plan' : 'Use this plan'}
       </button>
-      <p className="mt-2 text-[11px] leading-snug text-muted">
-        A draft to take to your counsellor, not a final schedule. Course availability and conflicts
+      <p className="mt-2 text-[12px] leading-snug text-muted">
+        A draft to take to your counselor, not a final schedule. Course availability and conflicts
         are decided at the school.
       </p>
     </div>

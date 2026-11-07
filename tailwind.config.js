@@ -1,4 +1,9 @@
 /** @type {import('tailwindcss').Config} */
+
+// Every colour is a role backed by a CSS variable in src/index.css, so light and
+// dark are two compositions of the same roles rather than one theme inverted.
+const role = (name) => `rgb(var(--c-${name}) / <alpha-value>)`
+
 export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
@@ -7,23 +12,30 @@ export default {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
       },
       colors: {
-        bg: '#F4F5F9',
-        surface: '#FFFFFF',
-        sunk: '#EFF1F7',
-        ink: '#0E1020',
-        'ink-2': '#394056',
-        muted: '#747B91',
-        line: '#E5E8F0',
+        bg: role('bg'),
+        surface: role('surface'),
+        raised: role('raised'),
+        sunk: role('sunk'),
+        ink: role('ink'),
+        'ink-2': role('ink-2'),
+        muted: role('muted'),
+        line: role('line'),
         brand: {
-          DEFAULT: '#4F46E5',
-          deep: '#352FA8',
-          mid: '#6D66EE',
-          soft: '#E8E7FD',
-          wash: '#F3F3FE',
+          // fill: buttons, active chips, slider tracks
+          DEFAULT: role('brand'),
+          press: role('brand-press'),
+          // brand-coloured text and icons on the canvas
+          ink: role('brand-ink'),
+          // text that sits on brand-soft / brand-wash
+          deep: role('brand-deep'),
+          mid: role('brand-mid'),
+          soft: role('brand-soft'),
+          wash: role('brand-wash'),
         },
-        good: { DEFAULT: '#0E9F7E', soft: '#DFF5EF' },
-        warn: { DEFAULT: '#D9534A', soft: '#FDECEA' },
+        good: { DEFAULT: role('good'), ink: role('good-ink'), soft: role('good-soft') },
+        warn: { DEFAULT: role('warn'), ink: role('warn-ink'), soft: role('warn-soft') },
         // 1 -> 10. Cool = light / easy / calm, warm = heavy / watch out.
+        // Fills only; score text goes through .tone-text so it stays readable.
         scale: {
           1: '#14A08A',
           2: '#29A472',
@@ -38,25 +50,43 @@ export default {
         },
       },
       boxShadow: {
-        card: '0 1px 2px rgba(14,16,32,0.04), 0 10px 30px -18px rgba(14,16,32,0.22)',
-        lift: '0 2px 6px rgba(14,16,32,0.06), 0 22px 44px -22px rgba(14,16,32,0.32)',
-        bar: '0 -10px 30px -18px rgba(14,16,32,0.25)',
+        card: 'var(--shadow-card)',
+        lift: 'var(--shadow-lift)',
+        bar: 'var(--shadow-bar)',
+        glow: 'var(--shadow-glow)',
       },
       borderRadius: {
         xl2: '1.15rem',
         '4xl': '1.9rem',
       },
+      transitionTimingFunction: {
+        out: 'cubic-bezier(0.16, 1, 0.3, 1)',
+      },
       keyframes: {
-        'rise-in': { '0%': { opacity: '0', transform: 'translateY(10px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+        'rise-in': { '0%': { opacity: '0', transform: 'translateY(8px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
         'fade-in': { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
-        'pop-in': { '0%': { opacity: '0', transform: 'scale(0.95)' }, '60%': { transform: 'scale(1.015)' }, '100%': { opacity: '1', transform: 'scale(1)' } },
-        'sheet-up': { '0%': { opacity: '0', transform: 'translateY(26px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+        'pop-in': { '0%': { opacity: '0', transform: 'scale(0.94)' }, '100%': { opacity: '1', transform: 'scale(1)' } },
+        'sheet-up': { '0%': { opacity: '0', transform: 'translateY(24px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+        bump: { '0%': { transform: 'scale(1)' }, '40%': { transform: 'scale(1.28)' }, '100%': { transform: 'scale(1)' } },
+        'draw-in': { '0%': { strokeDashoffset: 'var(--len, 40)' }, '100%': { strokeDashoffset: '0' } },
+        nudge: { '0%': { transform: 'scale(1)' }, '35%': { transform: 'scale(1.14)' }, '100%': { transform: 'scale(1)' } },
+        ring: { '0%': { opacity: '0.55', transform: 'scale(0.85)' }, '100%': { opacity: '0', transform: 'scale(1.7)' } },
+        burst: {
+          '0%': { opacity: '0', transform: 'translate(0, 0) scale(0.4)' },
+          '15%': { opacity: '1' },
+          '100%': { opacity: '0', transform: 'translate(var(--dx), var(--dy)) scale(1)' },
+        },
       },
       animation: {
-        'rise-in': 'rise-in 0.45s cubic-bezier(0.22,1,0.36,1) both',
-        'fade-in': 'fade-in 0.35s ease both',
-        'pop-in': 'pop-in 0.4s cubic-bezier(0.22,1,0.36,1) both',
-        'sheet-up': 'sheet-up 0.45s cubic-bezier(0.22,1,0.36,1) both',
+        'rise-in': 'rise-in 0.42s cubic-bezier(0.16,1,0.3,1) both',
+        'fade-in': 'fade-in 0.3s ease both',
+        'pop-in': 'pop-in 0.36s cubic-bezier(0.16,1,0.3,1) both',
+        'sheet-up': 'sheet-up 0.42s cubic-bezier(0.16,1,0.3,1) both',
+        bump: 'bump 0.38s cubic-bezier(0.16,1,0.3,1)',
+        'draw-in': 'draw-in 0.5s cubic-bezier(0.16,1,0.3,1) 0.12s both',
+        nudge: 'nudge 0.28s cubic-bezier(0.16,1,0.3,1)',
+        ring: 'ring 0.9s cubic-bezier(0.16,1,0.3,1) 0.1s both',
+        burst: 'burst 0.9s cubic-bezier(0.16,1,0.3,1) both',
       },
     },
   },

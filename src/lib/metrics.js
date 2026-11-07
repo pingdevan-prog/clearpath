@@ -108,14 +108,17 @@ export function tint(hex, alpha) {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`
 }
 
+// Neutral tone for "no score yet". A CSS colour so it follows light and dark.
+export const NO_TONE = 'rgb(var(--c-muted))'
+
 /** How a course reads at a glance, from the share who would take it again. */
 export function verdictFor(share) {
-  if (share == null) return { text: 'No verdict yet', tone: '#747B91' }
-  if (share >= 0.85) return { text: 'Take it', tone: '#0E9F7E' }
-  if (share >= 0.6) return { text: 'Worth it', tone: '#50A95B' }
-  if (share >= 0.4) return { text: 'Divided', tone: '#C6A435' }
-  if (share >= 0.2) return { text: 'Think twice', tone: '#E6713C' }
-  return { text: 'Most regret it', tone: '#CE3B3F' }
+  if (share == null) return { text: 'No verdict yet', tone: NO_TONE }
+  if (share >= 0.85) return { text: 'Take it', tone: RAMP[0] }
+  if (share >= 0.6) return { text: 'Worth it', tone: RAMP[2] }
+  if (share >= 0.4) return { text: 'Divided', tone: RAMP[5] }
+  if (share >= 0.2) return { text: 'Think twice', tone: RAMP[7] }
+  return { text: 'Most regret it', tone: RAMP[9] }
 }
 
 // What a class is like day to day. Course shape only — never the teacher.
@@ -174,27 +177,35 @@ export const LEVEL_STYLE = {
   AP: 'bg-brand-soft text-brand-deep',
   'Post AP': 'bg-brand-soft text-brand-deep',
   'Dual credit': 'bg-brand-soft text-brand-deep',
-  Honors: 'bg-good-soft text-good',
+  Honors: 'bg-good-soft text-good-ink',
   'On-level': 'bg-sunk text-ink-2',
   Modified: 'bg-sunk text-muted',
   Alternate: 'bg-sunk text-muted',
 }
 
+// Every department gets its own colour so the catalog reads at a glance.
+// Hues are spread around the wheel and kept clear of the brand indigo.
 export const DEPT_META = {
-  'Language Arts': { short: 'English', hue: '#5B6CF0' },
-  Mathematics: { short: 'Math', hue: '#4F46E5' },
-  Science: { short: 'Science', hue: '#0E9F7E' },
-  'Social Studies': { short: 'Social Studies', hue: '#C77A2A' },
-  'World Languages': { short: 'Languages', hue: '#2D8FD5' },
-  'Fine Arts': { short: 'Fine Arts', hue: '#B94BC4' },
-  'Technology & Career Education': { short: 'Tech & Career', hue: '#2FA3A8' },
-  'Health and PE': { short: 'Health & PE', hue: '#D9534A' },
-  'Miscellaneous Electives': { short: 'Other', hue: '#747B91' },
-  'Special Education': { short: 'Special Ed', hue: '#7A6FD4' },
+  'Language Arts': { short: 'English', hue: '#E0457B', icon: 'book' },
+  Mathematics: { short: 'Math', hue: '#2F7BEA', icon: 'math' },
+  Science: { short: 'Science', hue: '#12A37F', icon: 'flask' },
+  'Social Studies': { short: 'Social Studies', hue: '#E08A1E', icon: 'globe' },
+  'World Languages': { short: 'Languages', hue: '#0EA2C0', icon: 'speech' },
+  'Fine Arts': { short: 'Fine Arts', hue: '#B44FD6', icon: 'palette' },
+  'Technology & Career Education': { short: 'Tech & Career', hue: '#7FA52A', icon: 'chip' },
+  'Health and PE': { short: 'Health & PE', hue: '#EF5B3F', icon: 'heart' },
+  'Miscellaneous Electives': { short: 'Other', hue: '#7C8399', icon: 'spark' },
+  'Special Education': { short: 'Special Ed', hue: '#8A6CF0', icon: 'hands' },
 }
 
+const DEPT_FALLBACK = { hue: '#7C8399', icon: 'spark' }
+
 export function deptHue(dept) {
-  return (DEPT_META[dept] || { hue: '#747B91' }).hue
+  return (DEPT_META[dept] || DEPT_FALLBACK).hue
+}
+
+export function deptIcon(dept) {
+  return (DEPT_META[dept] || DEPT_FALLBACK).icon
 }
 
 export function deptShort(dept) {

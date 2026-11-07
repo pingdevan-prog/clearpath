@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { flushSync } from 'react-dom'
 import * as store from './lib/store'
 import { COURSE_MAP } from './data/courses'
 import { AppShell } from './components/AppShell'
@@ -10,7 +11,7 @@ import { CompareView } from './components/CompareView'
 import { ProfileView, SchoolsView } from './components/ProfileView'
 import { PlanView } from './components/PlanView'
 import { AuthLoading, CarryOverPrompt, SignIn } from './components/SignIn'
-import { SampleBanner } from './components/Bits'
+import { SampleBanner, prefersReducedMotion } from './components/Bits'
 
 export default function App() {
   const [view, setView] = useState('browse')
@@ -33,10 +34,21 @@ export default function App() {
   const samplesOn = store.samplesEnabled()
 
   const go = useCallback((next, id = null) => {
-    setView(next)
-    if (next === 'course') setCourseId(id)
-    if (next === 'write') setWriteCourseId(id)
-    window.scrollTo({ top: 0, behavior: 'auto' })
+    const apply = () => {
+      flushSync(() => {
+        setView(next)
+        if (next === 'course') setCourseId(id)
+        if (next === 'write') setWriteCourseId(id)
+      })
+      window.scrollTo({ top: 0, behavior: 'auto' })
+    }
+    // Screens cross-fade where the browser can, and simply swap where it cannot.
+    if (document.startViewTransition && !prefersReducedMotion()) {
+      // A second tap mid-fade skips the first fade; that is fine, not an error.
+      const t = document.startViewTransition(apply)
+      t.ready.catch(() => {})
+      t.finished.catch(() => {})
+    } else apply()
   }, [])
 
   const courses = useMemo(() => store.getCourses(school?.id), [school?.id, version])

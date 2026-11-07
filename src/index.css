@@ -3,31 +3,139 @@
 @tailwind utilities;
 
 @layer base {
+  /* ------------------------------------------------------------------------
+     Colour roles. Light and dark are composed separately, not inverted: the
+     dark canvas is a deep indigo night, surfaces step up in lightness for
+     elevation, and every text role is re-checked for contrast.
+     Values are RGB channels so Tailwind can apply opacity to them.
+     ------------------------------------------------------------------------ */
   :root {
     color-scheme: light;
+    --c-bg: 244 245 249;
+    --c-surface: 255 255 255;
+    --c-raised: 255 255 255;
+    --c-sunk: 238 240 246;
+    --c-ink: 14 16 32;
+    --c-ink-2: 57 64 86;
+    --c-muted: 101 108 130;
+    --c-line: 227 230 239;
+
+    --c-brand: 79 70 229;
+    --c-brand-press: 63 55 204;
+    --c-brand-ink: 67 56 202;
+    --c-brand-deep: 53 47 168;
+    --c-brand-mid: 109 102 238;
+    --c-brand-soft: 232 231 253;
+    --c-brand-wash: 243 243 254;
+
+    --c-good: 12 128 101;
+    --c-good-ink: 10 122 97;
+    --c-good-soft: 220 244 236;
+    --c-warn: 196 64 52;
+    --c-warn-ink: 184 55 46;
+    --c-warn-soft: 253 236 234;
+
+    --shadow-card: 0 1px 2px rgb(14 16 32 / 0.05), 0 10px 28px -18px rgb(14 16 32 / 0.24);
+    --shadow-lift: 0 2px 6px rgb(14 16 32 / 0.06), 0 24px 44px -22px rgb(14 16 32 / 0.34);
+    --shadow-bar: 0 -10px 30px -18px rgb(14 16 32 / 0.28);
+    --shadow-glow: 0 10px 24px -12px rgb(79 70 229 / 0.6);
+
+    --atmos-a: rgb(79 70 229 / 0.13);
+    --atmos-b: rgb(14 159 126 / 0.1);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --c-bg: 10 11 21;
+      --c-surface: 20 22 40;
+      --c-raised: 28 31 54;
+      --c-sunk: 33 36 60;
+      --c-ink: 236 238 248;
+      --c-ink-2: 194 198 218;
+      --c-muted: 147 153 178;
+      --c-line: 41 44 70;
+
+      --c-brand: 95 87 236;
+      --c-brand-press: 78 70 217;
+      --c-brand-ink: 171 166 255;
+      --c-brand-deep: 203 200 255;
+      --c-brand-mid: 124 118 245;
+      --c-brand-soft: 41 39 90;
+      --c-brand-wash: 29 28 60;
+
+      --c-good: 12 128 101;
+      --c-good-ink: 92 221 185;
+      --c-good-soft: 16 51 41;
+      --c-warn: 196 64 52;
+      --c-warn-ink: 255 155 145;
+      --c-warn-soft: 59 28 28;
+
+      --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 12px 30px -18px rgb(0 0 0 / 0.75);
+      --shadow-lift: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 24px 48px -22px rgb(0 0 0 / 0.9);
+      --shadow-bar: 0 -12px 32px -18px rgb(0 0 0 / 0.85);
+      --shadow-glow: 0 10px 26px -12px rgb(95 87 236 / 0.75);
+
+      --atmos-a: rgb(95 87 236 / 0.2);
+      --atmos-b: rgb(29 185 147 / 0.09);
+    }
   }
 
   html {
     -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
     @apply bg-bg text-ink font-sans antialiased;
-    background-image: radial-gradient(44rem 24rem at 8% -8%, rgba(79, 70, 229, 0.12), transparent 70%),
-      radial-gradient(38rem 20rem at 98% 2%, rgba(14, 159, 126, 0.1), transparent 70%);
+    background-image: radial-gradient(44rem 24rem at 8% -8%, var(--atmos-a), transparent 70%),
+      radial-gradient(38rem 20rem at 98% 2%, var(--atmos-b), transparent 70%);
     background-repeat: no-repeat;
     background-attachment: fixed;
+    caret-color: rgb(var(--c-brand));
+    font-feature-settings: 'cv11', 'ss01';
   }
 
+  /* Browser surfaces carry the design too. */
   ::selection {
-    background: #ddd9fd;
-    color: #2a2580;
+    background: rgb(var(--c-brand-soft));
+    color: rgb(var(--c-brand-deep));
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--c-line)) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--c-line));
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::placeholder {
+    color: rgb(var(--c-muted) / 0.85);
   }
 
   h1,
   h2,
   h3 {
     letter-spacing: -0.022em;
+    text-wrap: balance;
+  }
+  h1 {
+    /* Inter's display cut: crisper at headline sizes. */
+    font-variation-settings: 'opsz' 32;
+    letter-spacing: -0.034em;
+  }
+
+  p {
+    text-wrap: pretty;
   }
 
   button,
@@ -39,7 +147,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid #4f46e5;
+    outline: 2px solid rgb(var(--c-brand));
     outline-offset: 2px;
     border-radius: 8px;
   }
@@ -51,52 +159,60 @@
   }
 
   .card {
-    @apply rounded-xl2 border border-line bg-surface shadow-card;
+    @apply rounded-xl2 border border-line/80 bg-surface shadow-card;
+  }
+
+  /* A card you can press: lifts on hover, settles on press. */
+  .card-press {
+    @apply card transition-[transform,box-shadow,border-color] duration-300 ease-out hover:-translate-y-0.5 hover:border-line hover:shadow-lift active:translate-y-0 active:scale-[0.99];
   }
 
   .chip {
-    @apply inline-flex select-none items-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-surface px-3 py-1.5 text-[13px] font-medium text-ink-2 transition-all duration-200;
+    @apply inline-flex select-none items-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-surface px-3 py-1.5 text-[13px] font-medium text-ink-2 transition-[background-color,border-color,color,transform] duration-200 ease-out active:scale-[0.96];
   }
 
   .chip:hover {
     @apply border-brand/40 bg-brand-wash text-brand-deep;
   }
 
-  .chip-on {
+  .chip-on,
+  .chip-on:hover {
     @apply border-brand bg-brand text-white;
   }
 
-  .chip-on:hover {
-    @apply border-brand bg-brand-deep text-white;
-  }
-
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-[15px] font-semibold transition-all duration-200 active:scale-[0.985];
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-[15px] font-semibold transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out active:scale-[0.97];
   }
 
   .btn-primary {
-    @apply btn bg-brand text-white shadow-card hover:bg-brand-deep hover:shadow-lift;
+    @apply btn bg-brand text-white shadow-glow hover:bg-brand-press;
   }
 
   .btn-ghost {
-    @apply btn border border-line bg-surface text-ink-2 hover:border-brand/40 hover:text-brand-deep;
+    @apply btn border border-line bg-surface text-ink-2 hover:border-brand/40 hover:text-brand-ink;
   }
 
   .btn-primary:disabled,
   .btn-ghost:disabled {
-    @apply cursor-not-allowed opacity-40 hover:shadow-card;
+    @apply cursor-not-allowed opacity-40 shadow-none active:scale-100;
   }
 
   .field {
-    @apply w-full rounded-2xl border border-line bg-surface px-4 py-3 text-[15px] text-ink placeholder:text-muted/70 transition-colors;
+    @apply w-full rounded-2xl border border-line bg-surface px-4 py-3 text-[15px] text-ink transition-[border-color,box-shadow] duration-200;
   }
 
   .field:focus {
-    @apply border-brand/50 outline-none ring-4 ring-brand/10;
+    @apply border-brand/60 outline-none ring-4 ring-brand/15;
   }
 
-  .eyebrow {
-    @apply text-[11px] font-semibold uppercase tracking-[0.14em] text-muted;
+  /* Form-field label. Never used as a kicker above a heading. */
+  .label {
+    @apply text-[13px] font-semibold text-ink-2;
+  }
+
+  /* Section heading inside a screen. */
+  .section-title {
+    @apply text-[17px] font-bold tracking-tight text-ink;
   }
 }
 
@@ -114,21 +230,108 @@
   .tnum {
     font-variant-numeric: tabular-nums;
   }
+  .clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
   .clamp-3 {
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+
+  /* Score colour as text. The ramp's middle (yellow, amber) fails contrast as
+     text on its own, so it is pulled toward ink: darker in light mode, lighter
+     in dark mode. Set --tone inline. */
+  .tone-text {
+    color: color-mix(in oklab, var(--tone) 62%, rgb(var(--c-ink)));
+  }
+  /* Large bold numbers only need 3:1, so they keep more of their colour. */
+  .tone-text-lg {
+    color: color-mix(in oklab, var(--tone) 80%, rgb(var(--c-ink)));
+  }
+  .tone-fill {
+    background-color: var(--tone);
+  }
+  .tone-soft {
+    background-color: color-mix(in oklab, var(--tone) var(--tint, 14%), rgb(var(--c-surface)));
+  }
+
+  /* Department colour. Set --dept inline to the department's hue. */
+  .dept-ink {
+    color: color-mix(in oklab, var(--dept) 66%, rgb(var(--c-ink)));
+  }
+  .dept-fill {
+    background-color: var(--dept);
+  }
+  .dept-soft {
+    background-color: color-mix(in oklab, var(--dept) var(--tint, 13%), rgb(var(--c-surface)));
+  }
+  .dept-glow {
+    background-image: radial-gradient(130% 100% at 100% 0%, color-mix(in oklab, var(--dept) var(--glow, 9%), transparent), transparent 62%);
+  }
+  .dept-line {
+    border-color: color-mix(in oklab, var(--dept) 30%, rgb(var(--c-line)));
+  }
 }
 
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tint: 22%;
+    --glow: 16%;
+  }
+}
+
+/* Reduced motion: nothing slides, scales or sweeps; colour and opacity feedback
+   stay so every press still answers. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-property: color, background-color, border-color, opacity, box-shadow !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-rise-in,
+  .animate-pop-in,
+  .animate-sheet-up {
+    animation-name: fade-in !important;
+  }
+  .animate-bump,
+  .animate-nudge,
+  .animate-ring,
+  .animate-burst,
+  .animate-draw-in {
+    animation: none !important;
+  }
+  .animate-burst {
+    display: none;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* Screen changes cross-fade (browsers that support view transitions). Opacity
+   only, so the fixed tab bar never shifts. */
+::view-transition-old(root) {
+  animation: 140ms ease both vt-out;
+}
+::view-transition-new(root) {
+  animation: 260ms cubic-bezier(0.16, 1, 0.3, 1) both vt-in;
+}
+@keyframes vt-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes vt-in {
+  from {
+    opacity: 0;
   }
 }
 
@@ -155,8 +358,8 @@
     to right,
     var(--tone) 0%,
     var(--tone) var(--pct),
-    #E7E9F0 var(--pct),
-    #E7E9F0 100%
+    rgb(var(--c-sunk)) var(--pct),
+    rgb(var(--c-sunk)) 100%
   );
   transition: background 120ms linear;
 }
@@ -170,8 +373,8 @@
   border-radius: 999px;
   background: #ffffff;
   border: 5px solid var(--tone);
-  box-shadow: 0 2px 10px rgba(14, 16, 32, 0.22);
-  transition: transform 140ms cubic-bezier(0.22, 1, 0.36, 1), border-color 120ms linear;
+  box-shadow: 0 2px 10px rgb(14 16 32 / 0.24);
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), border-color 120ms linear;
 }
 .slider:hover::-webkit-slider-thumb {
   transform: scale(1.08);
@@ -183,7 +386,7 @@
 .slider::-moz-range-track {
   height: 14px;
   border-radius: 999px;
-  background: #e7e9f0;
+  background: rgb(var(--c-sunk));
 }
 .slider::-moz-range-progress {
   height: 14px;
@@ -196,8 +399,8 @@
   border-radius: 999px;
   background: #ffffff;
   border: 5px solid var(--tone);
-  box-shadow: 0 2px 10px rgba(14, 16, 32, 0.22);
-  transition: transform 140ms cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 2px 10px rgb(14 16 32 / 0.24);
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .slider:active::-moz-range-thumb {
   transform: scale(1.14);

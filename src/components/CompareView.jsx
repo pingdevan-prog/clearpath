@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { FACTORS, MIN_REVIEWS, bandLabel, deptShort, toneFor, verdictFor } from '../lib/metrics'
+import { FACTORS, MIN_REVIEWS, NO_TONE, bandLabel, deptHue, deptShort, toneFor, verdictFor } from '../lib/metrics'
 import { creditLabel, gradeLabel } from '../lib/stats'
-import { DeptTag, Empty, LevelPill } from './Bits'
+import { DeptBadge, Empty, Icon, LevelPill, tick } from './Bits'
 
 /** Two classes, side by side, on the things that decide it. */
 export function CompareView({ courses, statsByCourse, compare, onSetCompare, onOpenCourse, onBrowse }) {
@@ -27,17 +27,21 @@ export function CompareView({ courses, statsByCourse, compare, onSetCompare, onO
 
   return (
     <div className="wrap py-6 sm:py-9">
-      <h1 className="text-[28px] font-semibold leading-tight tracking-[-0.03em] text-ink sm:text-[32px]">
-        Compare two classes
-      </h1>
+      <h1 className="text-[28px] font-bold leading-tight text-ink sm:text-[34px]">Compare two classes</h1>
       <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-muted">
         The choice is almost never "is this class good". It is "which of these two". Put them next to
         each other.
       </p>
 
-      <div className="mt-6 grid grid-cols-2 gap-3">
+      <div className="relative mt-6 grid grid-cols-2 gap-3">
         <Slot course={a} stats={a && statsByCourse[a.id]} onPick={() => setPicking(0)} onClear={() => set(0, null)} />
         <Slot course={b} stats={b && statsByCourse[b.id]} onPick={() => setPicking(1)} onClear={() => set(1, null)} />
+        <span
+          aria-hidden
+          className="pointer-events-none absolute left-1/2 top-1/2 grid h-9 w-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-line bg-surface text-[12px] font-bold text-ink-2 shadow-card"
+        >
+          vs
+        </span>
       </div>
 
       {picking !== null && (
@@ -60,7 +64,13 @@ export function CompareView({ courses, statsByCourse, compare, onSetCompare, onO
         />
       ) : (
         <div className="card mt-4 px-5 py-10 text-center">
-          <h2 className="text-[17px] font-semibold text-ink">
+          <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-brand-soft text-brand-ink">
+            <svg viewBox="0 0 22 22" className="h-[22px] w-[22px]" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden>
+              <rect x="3" y="4" width="6.5" height="14" rx="2" />
+              <rect x="12.5" y="4" width="6.5" height="9" rx="2" />
+            </svg>
+          </span>
+          <h2 className="mt-4 text-[17px] font-bold text-ink">
             {a || b ? 'Pick one more class' : 'Pick two classes'}
           </h2>
           <p className="mx-auto mt-2 max-w-sm text-[14px] leading-relaxed text-muted">
@@ -81,12 +91,10 @@ function Slot({ course, stats, onPick, onClear }) {
       <button
         type="button"
         onClick={onPick}
-        className="flex min-h-[7.5rem] flex-col items-center justify-center gap-2 rounded-xl2 border-2 border-dashed border-line bg-surface/60 px-4 py-6 text-center transition-colors hover:border-brand/50 hover:bg-brand-wash"
+        className="group flex min-h-[9rem] flex-col items-center justify-center gap-2 rounded-xl2 border-2 border-dashed border-line bg-surface/60 px-4 py-6 text-center transition-[background-color,border-color,transform] duration-200 hover:border-brand/50 hover:bg-brand-wash active:scale-[0.98]"
       >
-        <span className="grid h-9 w-9 place-items-center rounded-full bg-brand-soft text-brand">
-          <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2">
-            <path d="M10 5v10M5 10h10" strokeLinecap="round" />
-          </svg>
+        <span className="grid h-10 w-10 place-items-center rounded-full bg-brand-soft text-brand-ink transition-transform duration-300 ease-out group-hover:scale-110">
+          <Icon name="plus" size={18} stroke={2.4} />
         </span>
         <span className="text-[13.5px] font-semibold text-ink-2">Pick a class</span>
       </button>
@@ -94,36 +102,42 @@ function Slot({ course, stats, onPick, onClear }) {
   }
   const verdict = verdictFor(stats?.hasEnough ? stats.takeAgain : null)
   return (
-    <div className="card flex min-h-[7.5rem] flex-col p-4">
+    <div className="card dept-glow flex min-h-[9rem] animate-pop-in flex-col p-4" style={{ '--dept': deptHue(course.dept) }}>
       <div className="flex items-start justify-between gap-2">
-        <DeptTag dept={course.dept} group={deptShort(course.dept)} />
+        <DeptBadge dept={course.dept} size={34} />
         <button
           type="button"
           onClick={onClear}
-          className="-mr-1 -mt-1 shrink-0 rounded-full p-1.5 text-muted hover:text-ink"
-          aria-label="Remove"
+          className="-mr-1.5 -mt-1.5 shrink-0 rounded-full p-1.5 text-muted transition-colors hover:bg-sunk hover:text-ink"
+          aria-label={`Remove ${course.name}`}
         >
-          <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M6 6l8 8M14 6l-8 8" strokeLinecap="round" />
-          </svg>
+          <Icon name="x" size={16} stroke={2.2} />
         </button>
       </div>
-      <h2 className="mt-1.5 text-[15.5px] font-semibold leading-snug tracking-[-0.015em] text-ink">
-        {course.name}
-      </h2>
+      <p className="dept-ink mt-2.5 text-[12px] font-semibold" style={{ '--dept': deptHue(course.dept) }}>
+        {deptShort(course.dept)}
+      </p>
+      <h2 className="mt-0.5 text-[15.5px] font-bold leading-snug tracking-[-0.015em] text-ink">{course.name}</h2>
       <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted">
         <LevelPill level={course.level} />
         <span>{gradeLabel(course.grades)}</span>
       </div>
       <div className="mt-auto pt-3">
-        <span className="text-[12.5px] font-semibold" style={{ color: verdict.tone }}>
+        <span className="tone-text text-[12.5px] font-bold" style={{ '--tone': verdict.tone }}>
           {verdict.text}
         </span>
         <span className="ml-1.5 text-[12px] text-muted">
           {stats?.count ? `· ${stats.count} reviews` : '· no reviews'}
         </span>
       </div>
-      <button type="button" onClick={onPick} className="mt-2 text-left text-[12.5px] font-semibold text-brand">
+      <button
+        type="button"
+        onClick={onPick}
+        className="mt-2 inline-flex items-center gap-1 self-start rounded-full text-[12.5px] font-semibold text-brand-ink transition-colors hover:text-brand-deep"
+      >
+        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+          <path d="M4 7h11l-3-3M16 13H5l3 3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
         Swap
       </button>
     </div>
@@ -144,25 +158,38 @@ function Picker({ courses, statsByCourse, taken, onPick, onClose }) {
   }, [courses, statsByCourse, query, taken])
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-ink/35 p-0 backdrop-blur-sm sm:items-center sm:p-6" role="dialog">
+    <div
+      className="fixed inset-0 z-40 flex animate-fade-in items-end justify-center bg-black/40 p-0 backdrop-blur-sm sm:items-center sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Pick a class"
+    >
       <button type="button" className="absolute inset-0 cursor-default" onClick={onClose} aria-label="Close" />
-      <div className="relative flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-t-4xl bg-surface shadow-lift animate-sheet-up sm:rounded-4xl">
+      <div className="relative flex max-h-[85vh] w-full max-w-lg animate-sheet-up flex-col overflow-hidden rounded-t-4xl bg-raised shadow-lift sm:rounded-4xl">
+        <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-line sm:hidden" aria-hidden />
         <div className="border-b border-line p-4">
           <div className="flex items-center justify-between gap-3">
-            <h3 className="text-[16px] font-semibold text-ink">Pick a class</h3>
-            <button type="button" onClick={onClose} className="rounded-full p-1.5 text-muted hover:text-ink">
-              <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M6 6l8 8M14 6l-8 8" strokeLinecap="round" />
-              </svg>
+            <h3 className="text-[17px] font-bold text-ink">Pick a class</h3>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full p-1.5 text-muted transition-colors hover:bg-sunk hover:text-ink"
+              aria-label="Close"
+            >
+              <Icon name="x" size={18} stroke={2.2} />
             </button>
           </div>
-          <input
-            className="field mt-3"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search classes"
-            autoFocus
-          />
+          <div className="relative mt-3">
+            <Icon name="search" size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
+            <input
+              className="field pl-11"
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search classes"
+              autoFocus
+            />
+          </div>
           {!query && <p className="mt-2 text-[12px] text-muted">Most reviewed first.</p>}
         </div>
         <div className="flex-1 overflow-y-auto">
@@ -170,13 +197,17 @@ function Picker({ courses, statsByCourse, taken, onPick, onClose }) {
             <button
               key={c.id}
               type="button"
-              onClick={() => onPick(c.id)}
-              className="flex w-full items-center justify-between gap-3 border-b border-line px-4 py-3 text-left last:border-0 hover:bg-brand-wash"
+              onClick={() => {
+                tick()
+                onPick(c.id)
+              }}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-brand-wash"
             >
-              <span className="min-w-0">
+              <DeptBadge dept={c.dept} size={34} />
+              <span className="min-w-0 flex-1">
                 <span className="block truncate text-[14.5px] font-semibold text-ink">{c.name}</span>
-                <span className="block truncate text-[12px] text-muted">
-                  {c.group || c.dept} · {statsByCourse[c.id]?.count || 0} reviews
+                <span className="block truncate text-[12.5px] text-muted">
+                  {deptShort(c.dept)} · {statsByCourse[c.id]?.count || 0} reviews
                 </span>
               </span>
               <LevelPill level={c.level} />
@@ -195,13 +226,23 @@ function Comparison({ a, b, sa, sb, onOpenCourse }) {
   return (
     <div className="mt-4 space-y-4">
       {bothScored && (
-        <section className="card p-5">
-          <div className="eyebrow">The short version</div>
-          <p className="mt-2 text-[16px] leading-relaxed text-ink">{takeaway(a, b, sa, sb)}</p>
+        <section className="flex gap-3.5 rounded-xl2 border border-brand/15 bg-brand-wash p-5">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand text-white shadow-glow">
+            <Icon name="sparkle" size={18} stroke={2} />
+          </span>
+          <p className="text-[15.5px] leading-relaxed text-ink">{takeaway(a, b, sa, sb)}</p>
         </section>
       )}
 
-      <section className="card overflow-hidden">
+      <section className="card">
+        <div className="sticky top-14 z-10 grid grid-cols-2 gap-3 rounded-t-xl2 border-b border-line bg-surface/95 px-4 py-2.5 backdrop-blur-xl sm:px-5">
+          {[a, b].map((c) => (
+            <div key={c.id} className="flex min-w-0 items-center gap-2">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: deptHue(c.dept) }} />
+              <span className="truncate text-[13px] font-bold text-ink">{c.name}</span>
+            </div>
+          ))}
+        </div>
         <Row label="Would take it again" first>
           {[
             [sa, a],
@@ -211,8 +252,8 @@ function Comparison({ a, b, sa, sb, onOpenCourse }) {
             const verdict = verdictFor(v)
             return (
               <div key={i}>
-                <div className="tnum text-[24px] font-semibold leading-none" style={{ color: verdict.tone }}>
-                  {v == null ? '—' : `${Math.round(v * 100)}%`}
+                <div className="tone-text-lg tnum text-[26px] font-bold leading-none" style={{ '--tone': verdict.tone }}>
+                  {v == null ? '–' : `${Math.round(v * 100)}%`}
                 </div>
                 <div className="mt-1 text-[12px] text-muted">
                   {v == null ? `${s.count} of ${MIN_REVIEWS} reviews` : verdict.text}
@@ -233,22 +274,23 @@ function Comparison({ a, b, sa, sb, onOpenCourse }) {
                     ? v > other
                     : v < other
                   : false
-              const tone = v == null ? '#CDD2DE' : toneFor(f.key, v)
+              const tone = v == null ? NO_TONE : toneFor(f.key, v)
               return (
                 <div key={i}>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="tnum text-[20px] font-semibold leading-none" style={{ color: tone }}>
-                      {v == null ? '—' : v.toFixed(1)}
+                  <div className="flex items-center gap-1.5">
+                    <span className="tone-text tnum text-[21px] font-bold leading-none" style={{ '--tone': tone }}>
+                      {v == null ? '–' : v.toFixed(1)}
                     </span>
                     {better && (
-                      <span className="rounded-full bg-good-soft px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-[0.07em] text-good">
+                      <span className="inline-flex animate-pop-in items-center gap-0.5 rounded-full bg-good-soft px-1.5 py-0.5 text-[11px] font-bold text-good-ink">
+                        <Icon name="check" size={11} stroke={3} />
                         {f.polarity === 'benefit' ? 'Higher' : 'Lighter'}
                       </span>
                     )}
                   </div>
                   <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-sunk">
                     <div
-                      className="h-full rounded-full transition-[width] duration-700"
+                      className="h-full rounded-full transition-[width] duration-700 ease-out"
                       style={{ width: v == null ? '0%' : `${(v / 10) * 100}%`, background: tone }}
                     />
                   </div>
@@ -286,7 +328,7 @@ function Comparison({ a, b, sa, sb, onOpenCourse }) {
               {c.prereq && c.prereq !== 'None' ? (
                 <span className="text-ink-2">{c.prereq}</span>
               ) : c.prereq === 'None' ? (
-                <span className="font-medium text-good">None</span>
+                <span className="font-semibold text-good-ink">None</span>
               ) : (
                 <span className="text-muted">Not listed</span>
               )}
@@ -313,9 +355,10 @@ function Comparison({ a, b, sa, sb, onOpenCourse }) {
               <button
                 type="button"
                 onClick={() => onOpenCourse(c.id)}
-                className="mt-2 text-[12.5px] font-semibold text-brand hover:text-brand-deep"
+                className="group mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-brand-ink transition-colors hover:text-brand-deep"
               >
-                Open class →
+                Open class
+                <Icon name="arrow-right" size={15} stroke={2.2} className="transition-transform duration-200 group-hover:translate-x-0.5" />
               </button>
             </div>
           ))}
@@ -334,8 +377,8 @@ function Comparison({ a, b, sa, sb, onOpenCourse }) {
 
 function Row({ label, children, first = false, align = 'center' }) {
   return (
-    <div className={`${first ? '' : 'border-t border-line'} px-4 py-3.5 sm:px-5`}>
-      <div className="eyebrow">{label}</div>
+    <div className={`${first ? '' : 'border-t border-line'} px-4 py-4 sm:px-5`}>
+      <div className="text-[13px] font-semibold text-muted">{label}</div>
       <div className={`mt-2 grid grid-cols-2 gap-3 ${align === 'start' ? 'items-start' : 'items-center'}`}>
         {children}
       </div>

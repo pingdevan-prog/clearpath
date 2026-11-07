@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react'
 import { AVATAR_COLORS } from '../data/schools'
 import { GRADE_LEVELS, FACTORS, ROLES, profileSubtitle, toneFor } from '../lib/metrics'
 import { ordinal } from '../lib/stats'
+import { COURSE_MAP } from '../data/courses'
 import { SAMPLE_COURSE_COUNT } from '../data/sampleReviews'
-import { Avatar, BackButton, Empty, SchoolTile, Toggle } from './Bits'
+import { Avatar, BackButton, DeptBadge, Empty, Icon, SchoolTile, Toggle, tick } from './Bits'
 
 export function ProfileView({
   profile,
@@ -30,8 +31,17 @@ export function ProfileView({
     <div className="wrap py-6 sm:py-9">
       <div className="mx-auto max-w-2xl">
         {/* Profile */}
-        <section className="card p-5">
+        <section className="card overflow-hidden">
+          <div
+            aria-hidden
+            className="h-20 sm:h-24"
+            style={{
+              background: `linear-gradient(120deg, color-mix(in oklab, ${profile.color || 'rgb(var(--c-brand))'} 70%, rgb(var(--c-surface))), color-mix(in oklab, ${profile.color || 'rgb(var(--c-brand))'} 25%, rgb(var(--c-surface))))`,
+            }}
+          />
+          <div className="px-5 pb-5">
           {editing ? (
+            <div className="pt-5">
             <ProfileEditor
               profile={profile}
               onCancel={() => setEditing(false)}
@@ -40,30 +50,35 @@ export function ProfileView({
                 setEditing(false)
               }}
             />
-          ) : (
-            <div className="flex items-center gap-4">
-              <Avatar profile={profile} size={62} />
-              <div className="min-w-0 flex-1">
-                <h1 className="truncate text-[22px] font-semibold tracking-[-0.025em] text-ink">
-                  {profile.name}
-                </h1>
-                <p className="truncate text-[13.5px] text-muted">
-                  @{profile.handle}
-                  {profileSubtitle(profile) ? ` · ${profileSubtitle(profile)}` : ''}
-                </p>
-              </div>
-              <button type="button" className="chip shrink-0" onClick={() => setEditing(true)}>
-                Edit
-              </button>
             </div>
+          ) : (
+            <>
+              <div className="-mt-9 flex items-end justify-between gap-3">
+                <Avatar profile={profile} size={76} className="ring-4 ring-surface" />
+                <button type="button" className="chip shrink-0" onClick={() => setEditing(true)}>
+                  <Icon name="pen" size={14} stroke={2} />
+                  Edit profile
+                </button>
+              </div>
+              <h1 className="mt-3 truncate text-[23px] font-bold text-ink">{profile.name}</h1>
+              <p className="truncate text-[14px] text-muted">
+                @{profile.handle}
+                {profileSubtitle(profile) ? ` · ${profileSubtitle(profile)}` : ''}
+              </p>
+              <div className="mt-4 flex gap-6">
+                <Stat value={myReviews.length} label={myReviews.length === 1 ? 'review' : 'reviews'} />
+                <Stat value={myReviews.filter((r) => r.note).length} label="written" />
+                <Stat value={mySchools.length} label={mySchools.length === 1 ? 'school' : 'schools'} />
+              </div>
+            </>
           )}
 
           {authUser && (
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
               <div className="min-w-0">
-                <div className="eyebrow">Signed in with Google</div>
-                <div className="mt-0.5 truncate text-[13.5px] text-ink-2">{authUser.email}</div>
-                <div className="mt-1 text-[12px] leading-snug text-muted">
+                <div className="text-[13px] font-semibold text-ink-2">Signed in with Google</div>
+                <div className="mt-0.5 truncate text-[13.5px] text-muted">{authUser.email}</div>
+                <div className="mt-1 text-[12.5px] leading-snug text-muted">
                   Your reviews and plan are saved to this account, on every device you sign into.
                 </div>
               </div>
@@ -72,23 +87,25 @@ export function ProfileView({
               </button>
             </div>
           )}
+          </div>
         </section>
 
         {/* Schools */}
         <section className="card mt-4 p-5">
           <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-[16px] font-semibold text-ink">Your schools</h2>
+            <h2 className="section-title">Your schools</h2>
             <button
               type="button"
               onClick={onAddSchools}
-              className="text-[13px] font-semibold text-brand hover:text-brand-deep"
+              className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand-ink transition-colors hover:text-brand-deep"
             >
+              <Icon name="plus" size={15} stroke={2.4} />
               Add school
             </button>
           </div>
-          <div className="mt-3 space-y-2">
+          <div className="-mx-2 mt-2 divide-y divide-line">
             {mySchools.map((s) => (
-              <div key={s.id} className="flex items-center gap-3 rounded-2xl border border-line p-3">
+              <div key={s.id} className="flex items-center gap-3 px-2 py-3">
                 <SchoolTile school={s} size={38} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[14.5px] font-semibold text-ink">{s.name}</div>
@@ -97,8 +114,9 @@ export function ProfileView({
                   </div>
                 </div>
                 {activeSchool?.id === s.id ? (
-                  <span className="shrink-0 rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.07em] text-brand-deep">
-                    Open
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-soft px-2.5 py-1 text-[12px] font-semibold text-brand-deep">
+                    <Icon name="check" size={13} stroke={2.6} />
+                    Current
                   </span>
                 ) : (
                   <button type="button" className="chip shrink-0" onClick={() => onSwitchSchool(s.id)}>
@@ -109,12 +127,10 @@ export function ProfileView({
                   <button
                     type="button"
                     onClick={() => onRemoveSchool(s.id)}
-                    className="shrink-0 rounded-full p-1.5 text-muted hover:text-warn"
+                    className="shrink-0 rounded-full p-1.5 text-muted transition-colors hover:bg-warn-soft hover:text-warn-ink"
                     aria-label={`Remove ${s.name}`}
                   >
-                    <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M6 6l8 8M14 6l-8 8" strokeLinecap="round" />
-                    </svg>
+                    <Icon name="x" size={16} stroke={2.2} />
                   </button>
                 )}
               </div>
@@ -123,24 +139,28 @@ export function ProfileView({
         </section>
 
         {/* Your reviews */}
-        <section className="mt-6">
-          <h2 className="text-[19px] font-semibold tracking-[-0.02em] text-ink">
-            Your reviews {myReviews.length > 0 && <span className="text-muted">({myReviews.length})</span>}
+        <section className="mt-8">
+          <h2 className="text-[20px] font-bold text-ink">
+            Your reviews {myReviews.length > 0 && <span className="tnum font-semibold text-muted">{myReviews.length}</span>}
           </h2>
           {!myReviews.length ? (
-            <div className="card mt-3 px-5 py-9 text-center">
-              <h3 className="text-[16px] font-semibold text-ink">You have not written one yet</h3>
+            <div className="card mt-3 px-5 py-10 text-center">
+              <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-brand-soft text-brand-ink">
+                <Icon name="pen" size={22} />
+              </span>
+              <h3 className="mt-4 text-[16px] font-bold text-ink">You have not written one yet</h3>
               <p className="mx-auto mt-2 max-w-sm text-[14px] leading-relaxed text-muted">
                 Every class you review is one an underclassman does not have to guess about.
               </p>
             </div>
           ) : (
             <div className="mt-3 space-y-3">
-              {myReviews.map((r) => (
-                <div key={r.id} className="card p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <button type="button" onClick={() => onOpenCourse(r.courseId)} className="min-w-0 text-left">
-                      <div className="truncate text-[15.5px] font-semibold text-ink hover:text-brand">
+              {myReviews.map((r, i) => (
+                <div key={r.id} className="card animate-rise-in p-4" style={{ animationDelay: `${Math.min(i, 6) * 40}ms` }}>
+                  <div className="flex items-start gap-3">
+                    {COURSE_MAP[r.courseId] && <DeptBadge dept={COURSE_MAP[r.courseId].dept} size={38} />}
+                    <button type="button" onClick={() => onOpenCourse(r.courseId)} className="min-w-0 flex-1 text-left">
+                      <div className="truncate text-[15.5px] font-bold text-ink transition-colors hover:text-brand-ink">
                         {courseName(r.courseId)}
                       </div>
                       <div className="mt-0.5 text-[12.5px] text-muted">
@@ -152,22 +172,20 @@ export function ProfileView({
                     <button
                       type="button"
                       onClick={() => onDeleteReview(r.id)}
-                      className="shrink-0 text-[12.5px] font-semibold text-muted hover:text-warn"
+                      className="shrink-0 rounded-full px-2 py-1 text-[12.5px] font-semibold text-muted transition-colors hover:bg-warn-soft hover:text-warn-ink"
                     >
                       Delete
                     </button>
                   </div>
-                  <div className="mt-3 grid grid-cols-4 gap-3">
+                  <div className="mt-3.5 grid grid-cols-4 gap-3">
                     {FACTORS.map((f) => {
                       const v = r.scores?.[f.key]
                       return (
                         <div key={f.key}>
-                          <div className="tnum text-[15px] font-semibold leading-none" style={{ color: toneFor(f.key, v) }}>
-                            {typeof v === 'number' ? v : '—'}
+                          <div className="tone-text tnum text-[16px] font-bold leading-none" style={{ '--tone': toneFor(f.key, v) }}>
+                            {typeof v === 'number' ? v : '–'}
                           </div>
-                          <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">
-                            {f.short}
-                          </div>
+                          <div className="mt-1 text-[12px] font-medium text-muted">{f.short}</div>
                         </div>
                       )
                     })}
@@ -190,7 +208,7 @@ export function ProfileView({
             />
           </div>
           <div className="p-5">
-            <h3 className="text-[15px] font-semibold text-ink">How Clearpath handles reviews</h3>
+            <h3 className="text-[15px] font-bold text-ink">How Clearpath handles reviews</h3>
             <ul className="mt-2.5 space-y-2 text-[13.5px] leading-relaxed text-muted">
               <li>
                 <span className="font-semibold text-ink-2">No teacher ratings.</span> The class is
@@ -217,16 +235,16 @@ export function ProfileView({
           <div className="p-5">
             {confirmReset ? (
               <div>
-                <h3 className="text-[15px] font-semibold text-warn">Erase everything?</h3>
+                <h3 className="text-[15px] font-bold text-warn-ink">Erase everything?</h3>
                 <p className="mt-1.5 text-[13.5px] leading-relaxed text-muted">
                   {authUser
-                    ? 'This clears what is stored in this browser. Anything saved to your Google account stays — delete those reviews individually above.'
+                    ? 'This clears what is stored in this browser. Anything saved to your Google account stays. Delete those reviews one by one above.'
                     : 'Your profile, your schools and every review you wrote on this device. This cannot be undone.'}
                 </p>
                 <div className="mt-3 flex gap-2.5">
                   <button
                     type="button"
-                    className="btn-ghost !border-warn/40 !text-warn"
+                    className="btn border border-warn/40 bg-warn-soft text-warn-ink hover:border-warn"
                     onClick={() => {
                       onReset()
                       setConfirmReset(false)
@@ -243,7 +261,7 @@ export function ProfileView({
               <button
                 type="button"
                 onClick={() => setConfirmReset(true)}
-                className="text-[13.5px] font-semibold text-muted hover:text-warn"
+                className="text-[13.5px] font-semibold text-muted transition-colors hover:text-warn-ink"
               >
                 Start over on this device
               </button>
@@ -269,7 +287,7 @@ function ProfileEditor({ profile, onSave, onCancel }) {
         <input className="field" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} />
       </div>
       <div className="mt-4">
-        <div className="eyebrow">I am a</div>
+        <div className="label">I am a</div>
         <div className="mt-1.5 flex flex-wrap gap-2">
           {ROLES.map((r) => (
             <button
@@ -288,7 +306,7 @@ function ProfileEditor({ profile, onSave, onCancel }) {
       </div>
       {role === 'student' && (
         <div className="mt-4 animate-rise-in">
-          <div className="eyebrow">Grade</div>
+          <div className="label">Grade</div>
           <div className="mt-1.5 flex gap-2">
             {GRADE_LEVELS.map((g) => (
               <button
@@ -304,17 +322,25 @@ function ProfileEditor({ profile, onSave, onCancel }) {
         </div>
       )}
       <div className="mt-4">
-        <div className="eyebrow">Color</div>
+        <div className="label">Color</div>
         <div className="mt-2 flex flex-wrap gap-2.5">
           {AVATAR_COLORS.map((c) => (
             <button
               key={c}
               type="button"
-              onClick={() => setColor(c)}
+              onClick={() => {
+                tick()
+                setColor(c)
+              }}
               aria-label={`Use color ${c}`}
-              className={`h-8 w-8 rounded-full ${color === c ? 'ring-2 ring-ink/70 ring-offset-2' : ''}`}
+              aria-pressed={color === c}
+              className={`grid h-9 w-9 place-items-center rounded-full text-white transition-transform duration-200 ease-out active:scale-90 ${
+                color === c ? 'scale-110 ring-2 ring-ink/60 ring-offset-2 ring-offset-surface' : 'hover:scale-105'
+              }`}
               style={{ background: c }}
-            />
+            >
+              {color === c && <Icon name="check" size={16} stroke={2.8} className="animate-pop-in" />}
+            </button>
           ))}
         </div>
       </div>
@@ -352,20 +378,22 @@ export function SchoolsView({ schools, mySchools, activeSchool, onAdd, onOpen, o
     <div className="wrap py-6 sm:py-9">
       <div className="mx-auto max-w-2xl">
         <BackButton onClick={onBack} label="Back" />
-        <h1 className="mt-4 text-[28px] font-semibold leading-tight tracking-[-0.03em] text-ink">
-          Schools
-        </h1>
+        <h1 className="mt-3 text-[28px] font-bold leading-tight text-ink sm:text-[34px]">Schools</h1>
         <p className="mt-2 text-[15px] leading-relaxed text-muted">
           Clearpath keeps every school separate, because a class only means something next to the
           other classes at the same school.
         </p>
 
-        <input
-          className="field mt-5"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search schools or districts"
-        />
+        <div className="relative mt-5">
+          <Icon name="search" size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
+          <input
+            className="field pl-11"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search schools or districts"
+          />
+        </div>
 
         <div className="mt-4 space-y-2.5">
           {results.map((school) => (
@@ -375,11 +403,11 @@ export function SchoolsView({ schools, mySchools, activeSchool, onAdd, onOpen, o
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="truncate text-[15px] font-semibold text-ink">{school.name}</span>
                   {school.catalog ? (
-                    <span className="rounded-md bg-good-soft px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.09em] text-good">
+                    <span className="rounded-md bg-good-soft px-1.5 py-0.5 text-[11.5px] font-semibold text-good-ink">
                       Catalog ready
                     </span>
                   ) : (
-                    <span className="rounded-md bg-sunk px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.09em] text-muted">
+                    <span className="rounded-md bg-sunk px-1.5 py-0.5 text-[11.5px] font-semibold text-muted">
                       Not added yet
                     </span>
                   )}
@@ -390,8 +418,9 @@ export function SchoolsView({ schools, mySchools, activeSchool, onAdd, onOpen, o
               </div>
               {added.has(school.id) ? (
                 activeSchool?.id === school.id ? (
-                  <span className="shrink-0 rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.07em] text-brand-deep">
-                    Open
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-soft px-2.5 py-1 text-[12px] font-semibold text-brand-deep">
+                    <Icon name="check" size={13} stroke={2.6} />
+                    Current
                   </span>
                 ) : (
                   <button type="button" className="chip shrink-0" onClick={() => onOpen(school.id)}>
@@ -413,6 +442,15 @@ export function SchoolsView({ schools, mySchools, activeSchool, onAdd, onOpen, o
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+function Stat({ value, label }) {
+  return (
+    <div>
+      <div className="tnum text-[19px] font-bold leading-none text-ink">{value}</div>
+      <div className="mt-1 text-[12.5px] text-muted">{label}</div>
     </div>
   )
 }

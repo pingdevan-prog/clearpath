@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AVATAR_COLORS } from '../data/schools'
 import { GRADE_LEVELS, ROLES, profileSubtitle } from '../lib/metrics'
-import { Avatar, Logo, Mark, SchoolTile } from './Bits'
+import { Avatar, Icon, Mark, SchoolTile, tick } from './Bits'
 
 /**
  * First run: make a profile, then add your school. Two steps, nothing optional
@@ -50,15 +50,15 @@ function Shell({ children, wide = false }) {
 
 function Welcome({ onStart }) {
   const lines = [
-    ['Scores, not rumors', 'Difficulty, homework, fun and worth it, each out of 10, from students who finished the class.'],
-    ['Every class in the catalog', 'All 306 Westlake courses with their real prerequisites and course descriptions.'],
-    ['Never the teacher', 'Clearpath rates the class. There is no field for rating a person, on purpose.'],
+    ['Scores, not rumors', 'Difficulty, homework, fun and worth it, each out of 10, from students who finished the class.', 'math', '#12A37F'],
+    ['Every class in the catalog', 'All 306 Westlake courses with their real prerequisites and course descriptions.', 'book', '#2F7BEA'],
+    ['Never the teacher', 'Clearpath rates the class. There is no field for rating a person, on purpose.', 'heart', '#E0457B'],
   ]
   return (
     <Shell>
       <div className="animate-rise-in">
         <Mark size={62} />
-        <h1 className="mt-7 text-[38px] font-semibold leading-[1.05] tracking-[-0.035em] text-ink">
+        <h1 className="mt-7 text-[40px] font-bold leading-[1.04] text-ink">
           Pick next year
           <br />
           with the facts.
@@ -68,15 +68,21 @@ function Welcome({ onStart }) {
           the class. No more picking a schedule off a rumor and regretting it in October.
         </p>
         <div className="mt-8 space-y-4">
-          {lines.map(([title, body], i) => (
+          {lines.map(([title, body, icon, hue], i) => (
             <div
               key={title}
-              className="flex gap-3.5 animate-rise-in"
+              className="flex animate-rise-in gap-3.5"
               style={{ animationDelay: `${120 + i * 90}ms` }}
             >
-              <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand" />
+              <span
+                className="dept-soft dept-ink grid h-10 w-10 shrink-0 place-items-center rounded-xl"
+                style={{ '--dept': hue }}
+                aria-hidden
+              >
+                <Icon name={icon} size={20} stroke={1.9} />
+              </span>
               <div>
-                <h2 className="text-[15px] font-semibold text-ink">{title}</h2>
+                <h2 className="text-[15px] font-bold text-ink">{title}</h2>
                 <p className="mt-0.5 text-[14px] leading-relaxed text-muted">{body}</p>
               </div>
             </div>
@@ -84,6 +90,7 @@ function Welcome({ onStart }) {
         </div>
         <button type="button" onClick={onStart} className="btn-primary mt-9 w-full">
           Create your profile
+          <Icon name="arrow-right" size={17} stroke={2.2} />
         </button>
         <p className="mt-3 text-center text-[12.5px] text-muted">
           Takes about thirty seconds. Everything stays on this device.
@@ -121,21 +128,19 @@ function ProfileStep({ onDone, suggested }) {
   return (
     <Shell>
       <div className="animate-rise-in">
-        <div className="eyebrow">Step 1 of 2</div>
-        <h1 className="mt-2 text-[30px] font-semibold leading-tight tracking-[-0.03em] text-ink">
-          Make your profile
-        </h1>
+        <StepBars step={1} />
+        <h1 className="mt-4 text-[30px] font-bold leading-tight text-ink">Make your profile</h1>
         <p className="mt-2 text-[15px] leading-relaxed text-muted">
           {suggested
-            ? 'Pulled from your Google account — change anything you like. Your name is never attached to a review unless you choose to attach it.'
+            ? 'Pulled from your Google account. Change anything you like. Your name is never attached to a review unless you choose to attach it.'
             : 'Your name is never attached to a review unless you choose to attach it. Reviews post anonymously by default.'}
         </p>
 
         <div className="card mt-7 p-5">
           <div className="flex items-center gap-4">
-            <Avatar profile={preview} size={58} />
+            <Avatar profile={preview} size={58} className="transition-colors duration-300" />
             <div className="min-w-0">
-              <div className="truncate text-[17px] font-semibold text-ink">{preview.name}</div>
+              <div className="truncate text-[17px] font-bold text-ink">{preview.name}</div>
               <div className="truncate text-[13.5px] text-muted">
                 @{effectiveHandle || 'username'}
                 {profileSubtitle(preview) ? ` · ${profileSubtitle(preview)}` : ''}
@@ -145,7 +150,7 @@ function ProfileStep({ onDone, suggested }) {
 
           <div className="mt-5 space-y-4">
             <div>
-              <label className="eyebrow" htmlFor="cp-name">
+              <label className="label" htmlFor="cp-name">
                 Name
               </label>
               <input
@@ -159,7 +164,7 @@ function ProfileStep({ onDone, suggested }) {
               />
             </div>
             <div>
-              <label className="eyebrow" htmlFor="cp-handle">
+              <label className="label" htmlFor="cp-handle">
                 Username
               </label>
               <div className="relative mt-1.5">
@@ -180,23 +185,29 @@ function ProfileStep({ onDone, suggested }) {
               </div>
             </div>
             <div>
-              <div className="eyebrow">I am a</div>
+              <div className="label">I am a</div>
               <div className="mt-1.5 grid grid-cols-2 gap-2">
                 {ROLES.map((r) => (
                   <button
                     key={r.value}
                     type="button"
                     onClick={() => {
+                      tick()
                       setRole(r.value)
                       if (r.value !== 'student') setGrade(null)
                     }}
                     aria-pressed={role === r.value}
-                    className={`rounded-2xl border px-3.5 py-3 text-left transition-all active:scale-[0.98] ${
+                    className={`relative rounded-2xl border px-3.5 py-3 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 active:scale-[0.97] ${
                       role === r.value
-                        ? 'border-brand bg-brand-wash shadow-card'
+                        ? 'border-brand bg-brand-wash shadow-card ring-1 ring-brand'
                         : 'border-line bg-surface hover:border-brand/40'
                     }`}
                   >
+                    {role === r.value && (
+                      <span className="absolute right-2.5 top-2.5 grid h-5 w-5 animate-pop-in place-items-center rounded-full bg-brand text-white">
+                        <Icon name="check" size={12} stroke={3} />
+                      </span>
+                    )}
                     <span className="block text-[14.5px] font-semibold text-ink">{r.label}</span>
                     <span className="mt-0.5 block text-[12px] leading-snug text-muted">{r.blurb}</span>
                   </button>
@@ -206,14 +217,17 @@ function ProfileStep({ onDone, suggested }) {
 
             {role === 'student' && (
               <div className="animate-rise-in">
-                <div className="eyebrow">Grade</div>
+                <div className="label">Grade</div>
                 <div className="mt-1.5 flex gap-2">
                   {GRADE_LEVELS.map((g) => (
                     <button
                       key={g}
                       type="button"
-                      onClick={() => setGrade(g)}
-                      className={`chip flex-1 justify-center ${grade === g ? 'chip-on' : ''}`}
+                      onClick={() => {
+                        tick()
+                        setGrade(g)
+                      }}
+                      className={`chip flex-1 justify-center py-2 ${grade === g ? 'chip-on' : ''}`}
                     >
                       {g}th
                     </button>
@@ -222,19 +236,25 @@ function ProfileStep({ onDone, suggested }) {
               </div>
             )}
             <div>
-              <div className="eyebrow">Profile color</div>
+              <div className="label">Profile color</div>
               <div className="mt-2 flex flex-wrap gap-2.5">
                 {AVATAR_COLORS.map((c) => (
                   <button
                     key={c}
                     type="button"
                     aria-label={`Use color ${c}`}
-                    onClick={() => setColor(c)}
-                    className={`h-9 w-9 rounded-full transition-transform duration-150 active:scale-90 ${
-                      color === c ? 'ring-2 ring-offset-2 ring-ink/70' : ''
+                    aria-pressed={color === c}
+                    onClick={() => {
+                      tick()
+                      setColor(c)
+                    }}
+                    className={`grid h-9 w-9 place-items-center rounded-full text-white transition-transform duration-200 ease-out active:scale-90 ${
+                      color === c ? 'scale-110 ring-2 ring-ink/60 ring-offset-2 ring-offset-surface' : 'hover:scale-105'
                     }`}
                     style={{ background: c }}
-                  />
+                  >
+                    {color === c && <Icon name="check" size={16} stroke={2.8} className="animate-pop-in" />}
+                  </button>
                 ))}
               </div>
             </div>
@@ -256,6 +276,7 @@ function ProfileStep({ onDone, suggested }) {
           className="btn-primary mt-6 w-full"
         >
           Continue
+          <Icon name="arrow-right" size={17} stroke={2.2} />
         </button>
       </div>
     </Shell>
@@ -286,10 +307,8 @@ function SchoolStep({ schools, profile, myschools, onAddSchool, onOpenSchool }) 
       <div className="animate-rise-in">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <div className="eyebrow">Step 2 of 2</div>
-            <h1 className="mt-2 text-[30px] font-semibold leading-tight tracking-[-0.03em] text-ink">
-              Add your school
-            </h1>
+            <StepBars step={2} />
+            <h1 className="mt-4 text-[30px] font-bold leading-tight text-ink">Add your school</h1>
           </div>
           <Avatar profile={profile} size={46} />
         </div>
@@ -299,18 +318,10 @@ function SchoolStep({ schools, profile, myschools, onAddSchool, onOpenSchool }) 
         </p>
 
         <div className="relative mt-6">
-          <svg
-            viewBox="0 0 20 20"
-            className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <circle cx="9" cy="9" r="5.5" />
-            <path d="M13.5 13.5L17 17" strokeLinecap="round" />
-          </svg>
+          <Icon name="search" size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted" />
           <input
             className="field pl-11"
+            type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search schools or districts"
@@ -319,17 +330,22 @@ function SchoolStep({ schools, profile, myschools, onAddSchool, onOpenSchool }) 
 
         <div className="mt-4 space-y-2.5">
           {results.map((school) => (
-            <div key={school.id} className="card flex items-center gap-3.5 p-3.5">
+            <div
+              key={school.id}
+              className={`card flex items-center gap-3.5 p-3.5 transition-[border-color,box-shadow] duration-300 ${
+                added.has(school.id) ? 'border-brand/50 ring-1 ring-brand/40' : ''
+              }`}
+            >
               <SchoolTile school={school} size={46} />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="truncate text-[15.5px] font-semibold text-ink">{school.name}</span>
                   {school.catalog ? (
-                    <span className="inline-flex items-center rounded-md bg-good-soft px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.09em] text-good">
+                    <span className="inline-flex items-center rounded-md bg-good-soft px-1.5 py-0.5 text-[11.5px] font-semibold text-good-ink">
                       Catalog ready
                     </span>
                   ) : (
-                    <span className="inline-flex items-center rounded-md bg-sunk px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.09em] text-muted">
+                    <span className="inline-flex items-center rounded-md bg-sunk px-1.5 py-0.5 text-[11.5px] font-semibold text-muted">
                       Not added yet
                     </span>
                   )}
@@ -340,11 +356,24 @@ function SchoolStep({ schools, profile, myschools, onAddSchool, onOpenSchool }) 
               </div>
               <button
                 type="button"
-                onClick={() => onAddSchool(school.id)}
+                onClick={() => {
+                  tick(12)
+                  onAddSchool(school.id)
+                }}
                 disabled={added.has(school.id)}
                 className={`chip shrink-0 ${added.has(school.id) ? 'chip-on' : ''}`}
               >
-                {added.has(school.id) ? 'Added' : 'Add'}
+                {added.has(school.id) ? (
+                  <>
+                    <Icon name="check" size={14} stroke={2.6} className="animate-pop-in" />
+                    Added
+                  </>
+                ) : (
+                  <>
+                    <Icon name="plus" size={14} stroke={2.6} />
+                    Add
+                  </>
+                )}
               </button>
             </div>
           ))}
@@ -361,12 +390,24 @@ function SchoolStep({ schools, profile, myschools, onAddSchool, onOpenSchool }) 
 
         {openable && (
           <div className="sticky bottom-4 mt-6">
-            <button type="button" onClick={() => onOpenSchool(openable.id)} className="btn-primary w-full">
+            <button type="button" onClick={() => onOpenSchool(openable.id)} className="btn-primary w-full animate-pop-in">
               Open {openable.short}
+              <Icon name="arrow-right" size={17} stroke={2.2} />
             </button>
           </div>
         )}
       </div>
     </Shell>
+  )
+}
+
+/** Two short bars instead of a "Step 1 of 2" label above the heading. */
+function StepBars({ step }) {
+  return (
+    <div className="flex gap-1.5" role="img" aria-label={`Step ${step} of 2`}>
+      {[1, 2].map((n) => (
+        <span key={n} className={`h-1.5 w-8 rounded-full ${n <= step ? 'bg-brand' : 'bg-line'}`} />
+      ))}
+    </div>
   )
 }

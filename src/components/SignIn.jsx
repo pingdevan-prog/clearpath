@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Mark } from './Bits'
+import { Icon, Mark } from './Bits'
 
 /**
  * The front door once Firebase is configured. One button, because a sign-up
@@ -26,9 +26,9 @@ export function SignIn({ onSignIn }) {
   }
 
   const points = [
-    ['It follows you', 'Your reviews and your four year plan show up on your phone, your laptop, the library computer.'],
-    ['You keep control', 'You can edit or delete anything you wrote, because the account knows it was yours.'],
-    ['Still anonymous', 'Reviews post without your name unless you choose to sign one. Other students never see who wrote what.'],
+    ['It follows you', 'Your reviews and your four year plan show up on your phone, your laptop, the library computer.', 'globe', '#2F7BEA'],
+    ['You keep control', 'You can edit or delete anything you wrote, because the account knows it was yours.', 'pen', '#12A37F'],
+    ['Still anonymous', 'Reviews post without your name unless you choose to sign one. Other students never see who wrote what.', 'hands', '#B44FD6'],
   ]
 
   return (
@@ -36,7 +36,7 @@ export function SignIn({ onSignIn }) {
       <div className="wrap flex-1 py-10 sm:py-16">
         <div className="mx-auto w-full max-w-md animate-rise-in">
           <Mark size={62} />
-          <h1 className="mt-7 text-[36px] font-semibold leading-[1.06] tracking-[-0.035em] text-ink">
+          <h1 className="mt-7 text-[40px] font-bold leading-[1.04] text-ink">
             Pick next year
             <br />
             with the facts.
@@ -50,24 +50,30 @@ export function SignIn({ onSignIn }) {
             type="button"
             onClick={go}
             disabled={busy}
-            className="mt-8 flex w-full items-center justify-center gap-3 rounded-full border border-line bg-surface px-5 py-3.5 text-[15.5px] font-semibold text-ink shadow-card transition-all duration-200 hover:border-brand/40 hover:shadow-lift active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-8 flex w-full items-center justify-center gap-3 rounded-full border border-line bg-surface px-5 py-3.5 text-[15.5px] font-semibold text-ink shadow-card transition-[border-color,box-shadow,transform] duration-200 hover:border-brand/40 hover:shadow-lift active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
           >
             <GoogleG />
             {busy ? 'Opening Google…' : 'Continue with Google'}
           </button>
 
           {error && (
-            <p className="mt-3 rounded-2xl bg-warn-soft px-4 py-3 text-[13px] leading-snug text-warn">
+            <p className="mt-3 animate-rise-in rounded-2xl bg-warn-soft px-4 py-3 text-[13px] leading-snug text-warn-ink" role="alert">
               {error}
             </p>
           )}
 
           <div className="mt-9 space-y-4">
-            {points.map(([title, body], i) => (
-              <div key={title} className="flex gap-3.5 animate-rise-in" style={{ animationDelay: `${120 + i * 90}ms` }}>
-                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand" />
+            {points.map(([title, body, icon, hue], i) => (
+              <div key={title} className="flex animate-rise-in gap-3.5" style={{ animationDelay: `${120 + i * 90}ms` }}>
+                <span
+                  className="dept-soft dept-ink grid h-10 w-10 shrink-0 place-items-center rounded-xl"
+                  style={{ '--dept': hue }}
+                  aria-hidden
+                >
+                  <Icon name={icon} size={20} stroke={1.9} />
+                </span>
                 <div>
-                  <h2 className="text-[15px] font-semibold text-ink">{title}</h2>
+                  <h2 className="text-[15px] font-bold text-ink">{title}</h2>
                   <p className="mt-0.5 text-[14px] leading-relaxed text-muted">{body}</p>
                 </div>
               </div>
@@ -111,8 +117,10 @@ function GoogleG() {
 export function AuthLoading() {
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <div className="flex flex-col items-center gap-4 animate-fade-in">
-        <Mark size={48} />
+      <div className="flex animate-fade-in flex-col items-center gap-4">
+        <span className="animate-pulse">
+          <Mark size={48} />
+        </span>
         <span className="text-[13.5px] text-muted">Checking your account…</span>
       </div>
     </div>
@@ -129,7 +137,7 @@ export function CarryOverPrompt({ carry, onImport, onDismiss }) {
   ].filter(Boolean)
 
   return (
-    <div className="border-b border-brand/20 bg-brand-wash">
+    <div className="border-b border-brand/15 bg-brand-wash">
       <div className="wrap flex flex-wrap items-center justify-between gap-3 py-2.5">
         <p className="text-[12.5px] leading-snug text-brand-deep">
           <span className="font-semibold">This browser already had {bits.join(', ')}.</span> Move it
@@ -144,7 +152,7 @@ export function CarryOverPrompt({ carry, onImport, onDismiss }) {
               await onImport()
               setBusy(false)
             }}
-            className="rounded-full bg-brand px-3.5 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-50"
+            className="rounded-full bg-brand px-3.5 py-1.5 text-[12.5px] font-semibold text-white transition-[background-color,transform] duration-200 hover:bg-brand-press active:scale-95 disabled:opacity-50"
           >
             {busy ? 'Moving…' : 'Move it over'}
           </button>
