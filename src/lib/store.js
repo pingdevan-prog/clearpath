@@ -14,6 +14,7 @@ import { COURSES, COURSE_MAP } from '../data/courses'
 import { SCHOOLS, SCHOOL_MAP } from '../data/schools'
 import { buildSampleReviews } from '../data/sampleReviews'
 import { summarize } from './stats'
+import { profileClassYear } from './metrics'
 import { HAS_FIREBASE, onAuth, signInWithGoogle, signOutOfGoogle } from './firebase'
 import * as cloud from './cloud'
 
@@ -405,7 +406,7 @@ export function addReview(input) {
   const who = getProfile()
   const author =
     input.anon === false && who
-      ? { name: who.name, handle: who.handle, color: who.color, grade: who.grade ?? null, role: who.role ?? null }
+      ? { name: who.name, handle: who.handle, color: who.color, classYear: profileClassYear(who), role: who.role ?? null }
       : null
 
   if (signedIn()) {

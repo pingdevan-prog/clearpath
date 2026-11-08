@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CATALOG_SOURCE, COURSE_MAP } from '../data/courses'
+import { CATALOG_SOURCE } from '../data/courses'
 import { FACTORS, MIN_REVIEWS, RAMP, toneFor, deptHue, deptShort } from '../lib/metrics'
 import { creditLabel, gradeLabel, ordinal } from '../lib/stats'
 import {
@@ -16,16 +16,11 @@ import {
   TakeAgainDial,
 } from './Bits'
 
-export function CourseView({ course, stats, reviews, compared, onToggleCompare, onBack, onWrite, onOpenCourse }) {
+export function CourseView({ course, stats, reviews, compared, onToggleCompare, onBack, onWrite }) {
   const [showAll, setShowAll] = useState(false)
   const s = stats
   const withNotes = reviews.filter((r) => r.note)
   const visible = showAll ? reviews : reviews.slice(0, 6)
-
-  // Other courses that name this one as a prerequisite — the next step up.
-  const leadsTo = Object.values(COURSE_MAP)
-    .filter((c) => c.id !== course.id && c.prereq && c.prereq !== 'None' && mentions(c.prereq, course.name))
-    .slice(0, 6)
 
   return (
     <div className="wrap py-5 sm:py-8">
@@ -132,32 +127,6 @@ export function CourseView({ course, stats, reviews, compared, onToggleCompare, 
               )}
             </div>
           </div>
-
-          {leadsTo.length > 0 && (
-            <div className="card p-5">
-              <h2 className="text-[15px] font-bold text-ink">This class unlocks</h2>
-              <p className="mt-1 text-[13px] text-muted">Courses that list it as a prerequisite.</p>
-              <div className="mt-3 -mx-2 space-y-0.5">
-                {leadsTo.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => onOpenCourse(c.id)}
-                    className="group flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-sunk"
-                  >
-                    <DeptBadge dept={c.dept} size={30} />
-                    <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink">{c.name}</span>
-                    <Icon
-                      name="chevron-right"
-                      size={16}
-                      stroke={2.2}
-                      className="text-muted transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-brand-ink"
-                    />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </section>
       </div>
 
@@ -329,12 +298,4 @@ function ReviewCard({ review, index }) {
       )}
     </article>
   )
-}
-
-/** Loose match: does this prerequisite text name that course? */
-function mentions(prereq, name) {
-  const p = prereq.toLowerCase()
-  const n = name.toLowerCase().replace(/\s*\(.*?\)\s*/g, ' ').trim()
-  if (n.length < 5) return false
-  return p.includes(n)
 }

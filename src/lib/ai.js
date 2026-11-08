@@ -9,6 +9,17 @@
 import { ADVISOR_WORKER_URL, HAS_LLM } from './advisorConfig'
 import { TOOLS, runTool } from './aiTools'
 import { CATALOG_SOURCE } from '../data/courses'
+import { gradeFor, profileClassYear } from './metrics'
+
+/** One line on where the student is in school, from their class year. */
+function classLine(profile) {
+  const y = profileClassYear(profile)
+  if (!y) return ''
+  const g = gradeFor(y)
+  if (g > 12) return `They graduated with the class of ${y}.`
+  if (g < 9) return `They are in grade ${g}, in middle school, and will be in the class of ${y}.`
+  return `They are in grade ${g}, class of ${y}.`
+}
 
 export { HAS_LLM }
 
@@ -33,7 +44,7 @@ You help students choose high school classes and build a four year plan.
 WHO YOU ARE TALKING TO
 ${profile?.name ? `First name: ${profile.name.split(' ')[0]}.` : ''} ${
     profile?.role ? `They are a ${profile.role}.` : ''
-  } ${profile?.grade ? `They are in grade ${profile.grade}.` : ''}
+  } ${classLine(profile)}
 
 HOW YOU KNOW ANYTHING
 You have tools that read the real course catalog, the real student reviews, and

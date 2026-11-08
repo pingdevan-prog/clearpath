@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { flushSync } from 'react-dom'
 import * as store from './lib/store'
+import { stageCrossed } from './lib/stages'
 import { COURSE_MAP } from './data/courses'
 import { AppShell } from './components/AppShell'
 import { Onboarding } from './components/Onboarding'
@@ -148,9 +149,11 @@ export default function App() {
           initialCourseId={writeCourseId}
           profile={profile}
           onSubmit={(input) => {
+            const before = store.getMyReviews().length
             const { count } = store.addReview({ ...input, schoolId: school.id })
-            return { count }
+            return { count, stage: stageCrossed(before, store.getMyReviews().length) }
           }}
+          onSeeProgress={() => go('you')}
           onCancel={() => go(writeCourseId ? 'course' : 'browse', writeCourseId)}
           onOpenCourse={(id) => go('course', id)}
         />

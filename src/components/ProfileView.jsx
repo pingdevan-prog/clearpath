@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import { AVATAR_COLORS } from '../data/schools'
-import { GRADE_LEVELS, FACTORS, ROLES, profileSubtitle, toneFor } from '../lib/metrics'
+import { FACTORS, ROLES, profileClassYear, profileSubtitle, toneFor } from '../lib/metrics'
 import { ordinal } from '../lib/stats'
 import { COURSE_MAP } from '../data/courses'
 import { SAMPLE_COURSE_COUNT } from '../data/sampleReviews'
-import { Avatar, BackButton, DeptBadge, Empty, Icon, SchoolTile, Toggle, tick } from './Bits'
+import { STAGES, stageIndex } from '../lib/stages'
+import { Avatar, BackButton, ClassYearSelect, DeptBadge, Empty, Icon, SchoolTile, StageMedal, Toggle, tick } from './Bits'
 
 export function ProfileView({
   profile,
@@ -89,6 +90,8 @@ export function ProfileView({
           )}
           </div>
         </section>
+
+        <StageCard count={myReviews.length} />
 
         {/* Schools */}
         <section className="card mt-4 p-5">
@@ -275,10 +278,10 @@ export function ProfileView({
 
 function ProfileEditor({ profile, onSave, onCancel }) {
   const [name, setName] = useState(profile.name)
-  const [role, setRole] = useState(profile.role || (profile.grade ? 'student' : null))
-  const [grade, setGrade] = useState(profile.grade)
+  const [role, setRole] = useState(profile.role || (profileClassYear(profile) ? 'student' : null))
+  const [classYear, setClassYear] = useState(profileClassYear(profile))
   const [color, setColor] = useState(profile.color)
-  const ready = name.trim().length >= 2 && role && (role !== 'student' || grade)
+  const ready = name.trim().length >= 2 && role && (role !== 'student' || classYear)
 
   return (
     <div>
@@ -295,7 +298,7 @@ function ProfileEditor({ profile, onSave, onCancel }) {
               type="button"
               onClick={() => {
                 setRole(r.value)
-                if (r.value !== 'student') setGrade(null)
+                if (r.value !== 'student') setClassYear(null)
               }}
               className={`chip ${role === r.value ? 'chip-on' : ''}`}
             >
@@ -306,18 +309,11 @@ function ProfileEditor({ profile, onSave, onCancel }) {
       </div>
       {role === 'student' && (
         <div className="mt-4 animate-rise-in">
-          <div className="label">Grade</div>
-          <div className="mt-1.5 flex gap-2">
-            {GRADE_LEVELS.map((g) => (
-              <button
-                key={g}
-                type="button"
-                onClick={() => setGrade(g)}
-                className={`chip flex-1 justify-center ${grade === g ? 'chip-on' : ''}`}
-              >
-                {g}th
-              </button>
-            ))}
+          <label className="label" htmlFor="cp-edit-class">
+            Class
+          </label>
+          <div className="mt-1.5">
+            <ClassYearSelect id="cp-edit-class" value={classYear} onChange={setClassYear} />
           </div>
         </div>
       )}
@@ -345,7 +341,7 @@ function ProfileEditor({ profile, onSave, onCancel }) {
         </div>
       </div>
       <div className="mt-5 flex gap-2.5">
-        <button type="button" className="btn-primary" disabled={!ready} onClick={() => onSave({ name: name.trim(), role, grade: role === 'student' ? grade : null, color })}>
+        <button type="button" className="btn-primary" disabled={!ready} onClick={() => onSave({ name: name.trim(), role, classYear: role === 'student' ? classYear : null, grade: null, color })}>
           Save
         </button>
         <button type="button" className="btn-ghost" onClick={onCancel}>
@@ -443,6 +439,97 @@ export function SchoolsView({ schools, mySchools, activeSchool, onAdd, onOpen, o
         </div>
       </div>
     </div>
+  )
+}
+
+/** Your stage, how far to the next one, and the whole trail of five. */
+function StageCard({ count }) {
+  const i = stageIndex(count)
+  const stage = STAGES[i] || null
+  const next = STAGES[i + 1] || null
+  const from = stage ? stage.at : 0
+  const toNext = next ? (count - from) / (next.at - from) : 1
+  // The trail line runs from the first badge's centre to the last one's.
+  const reached = i < 0 ? 0 : (i + (next ? toNext : 0)) / (STAGES.length - 1)
+  const accent = (stage || STAGES[0]).hue
+
+  return (
+    <section className="card dept-glow mt-4 p-5" style={{ '--dept': accent, '--glow': '14%' }} aria-label="Your review stage">
+      <div className="flex items-center gap-4">
+        {stage ? (
+          <StageMedal stage={stage} size={60} />
+        ) : (
+          <span className="grid h-[60px] w-[60px] shrink-0 place-items-center rounded-full border-2 border-dashed border-line text-muted">
+            <Icon name="steps" size={28} />
+          </span>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-semibold text-muted">
+            {stage ? `Stage ${i + 1} of ${STAGES.length}` : 'Your first stage is one review away'}
+          </div>
+          <h2 className="truncate text-[22px] font-bold leading-tight text-ink">{stage ? stage.name : 'Newcomer'}</h2>
+          <p className="mt-0.5 text-[13px] text-muted">
+            <span className="tnum font-semibold text-ink-2">{count}</span> {count === 1 ? 'review' : 'reviews'} written
+          </p>
+        </div>
+      </div>
+
+      {next ? (
+        <div className="mt-4">
+          <div className="flex items-baseline justify-between gap-3 text-[13px]">
+            <span className="font-semibold text-ink-2">
+              {next.at - count} more {next.at - count === 1 ? 'review' : 'reviews'} to {next.name}
+            </span>
+            <span className="tnum shrink-0 text-muted">
+              {count} / {next.at}
+            </span>
+          </div>
+          <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-sunk">
+            <div
+              className="h-full origin-left rounded-full transition-transform duration-700 ease-out"
+              style={{ transform: `scaleX(${Math.max(count / next.at, 0.04)})`, background: next.hue }}
+            />
+          </div>
+        </div>
+      ) : (
+        <p className="mt-4 text-[13.5px] leading-relaxed text-ink-2">
+          You reached the last stage. Every review from here is a favour to whoever comes next.
+        </p>
+      )}
+
+      <ol className="relative mt-6 grid grid-cols-5">
+        <span aria-hidden className="absolute left-[10%] right-[10%] top-[17px] h-1 -translate-y-1/2 rounded-full bg-line" />
+        <span
+          aria-hidden
+          className="absolute left-[10%] right-[10%] top-[17px] h-1 origin-left rounded-full transition-transform duration-700 ease-out"
+          style={{
+            transform: `translateY(-50%) scaleX(${reached})`,
+            background: `linear-gradient(90deg, ${STAGES.map((s) => s.hue).join(', ')})`,
+          }}
+        />
+        {STAGES.map((s, j) => {
+          const got = j <= i
+          return (
+            <li key={s.name} className="relative flex flex-col items-center text-center">
+              <StageMedal
+                stage={s}
+                size={34}
+                locked={!got}
+                style={j === i ? { boxShadow: `0 0 0 4px color-mix(in oklab, ${s.hue} 28%, transparent)` } : undefined}
+              />
+              <span className={`mt-2 text-[11px] font-semibold leading-tight sm:text-[12px] ${got ? 'text-ink' : 'text-muted'}`}>
+                {s.name}
+              </span>
+              <span className="tnum mt-0.5 text-[11px] text-muted">
+                {s.at}
+                <span className="hidden sm:inline"> {s.at === 1 ? 'review' : 'reviews'}</span>
+              </span>
+              <span className="sr-only">{got ? 'reached' : 'not reached yet'}</span>
+            </li>
+          )
+        })}
+      </ol>
+    </section>
   )
 }
 

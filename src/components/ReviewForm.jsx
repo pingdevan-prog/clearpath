@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   COURSE_TAGS,
   FACTORS,
@@ -9,10 +9,14 @@ import {
   bandLabel,
   RAMP,
   deptHue,
+  gradeFor,
+  highSchoolYears,
+  profileClassYear,
   toneFor,
 } from '../lib/metrics'
 import { ordinal } from '../lib/stats'
 import { Avatar, BackButton, DeptBadge, Empty, Icon, LevelPill, tick } from './Bits'
+import { StageUpModal } from './StageUp'
 
 const NOTE_LIMIT = 400
 const STEPS = ['Class', 'Scores', 'Details', 'Post']
@@ -22,14 +26,20 @@ const STEPS = ['Class', 'Scores', 'Details', 'Post']
  * again" are required; every score and every detail can be skipped, because a
  * review someone abandons helps nobody.
  */
-export function ReviewForm({ courses, statsByCourse, initialCourseId, profile, onSubmit, onCancel, onOpenCourse }) {
+export function ReviewForm({ courses, statsByCourse, initialCourseId, profile, onSubmit, onCancel, onOpenCourse, onSeeProgress }) {
   const [step, setStep] = useState(initialCourseId ? 1 : 0)
   const [courseId, setCourseId] = useState(initialCourseId || null)
   const [scores, setScores] = useState({})
   const [takeAgain, setTakeAgain] = useState(null)
   const [hours, setHours] = useState(null)
-  const [gradeTaken, setGradeTaken] = useState(profile?.grade ?? null)
-  const [year, setYear] = useState(SCHOOL_YEARS[1])
+  // A student's grade and school year start from their class year: the grade
+  // they are in now, this school year. Alumni pick the year they took it, and
+  // the grade follows from that.
+  const classYear = profileClassYear(profile)
+  const nowGrade = classYear ? gradeFor(classYear) : null
+  const inHighSchool = nowGrade >= 9 && nowGrade <= 12
+  const [gradeTaken, setGradeTaken] = useState(inHighSchool ? nowGrade : null)
+  const [year, setYear] = useState(inHighSchool ? SCHOOL_YEARS[0] : nowGrade > 12 ? null : SCHOOL_YEARS[1])
   const [tags, setTags] = useState([])
   const [note, setNote] = useState('')
   const [anon, setAnon] = useState(true)
@@ -69,7 +79,7 @@ export function ReviewForm({ courses, statsByCourse, initialCourseId, profile, o
       note,
       anon,
     })
-    setDone({ id: course.id, name: course.name, count: result.count })
+    setDone({ id: course.id, name: course.name, count: result.count, stage: result.stage || null })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -85,7 +95,14 @@ export function ReviewForm({ courses, statsByCourse, initialCourseId, profile, o
   }
 
   if (done) {
-    return <Confirmation done={done} onOpenCourse={() => onOpenCourse(done.id)} onAgain={reset} />
+    return (
+      <Confirmation
+        done={done}
+        onOpenCourse={() => onOpenCourse(done.id)}
+        onAgain={reset}
+        onSeeProgress={onSeeProgress}
+      />
+    )
   }
 
   return (
@@ -130,6 +147,7 @@ export function ReviewForm({ courses, statsByCourse, initialCourseId, profile, o
               setGradeTaken={setGradeTaken}
               year={year}
               setYear={setYear}
+              classYear={classYear}
               tags={tags}
               toggleTag={(t) =>
                 setTags((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]))
@@ -486,7 +504,11 @@ function FactorSlider({ factor, value, onChange, index }) {
 }
 
 /* ------------------------------------------- Step 3: context and tags */
-function DetailStep({ hours, setHours, gradeTaken, setGradeTaken, year, setYear, tags, toggleTag }) {
+function DetailStep({ hours, setHours, gradeTaken, setGradeTaken, year, setYear, classYear, tags, toggleTag }) {
+  // With a class year, grade and school year are one answer: pick the year and
+  // the grade is already right. Middle schoolers have no high school years yet,
+  // so they, like everyone without a class year, answer the two separately.
+  const hsYears = classYear ? highSchoolYears(classYear) : []
   return (
     <section>
       <h2 className="text-[21px] font-bold text-ink">A bit of context</h2>
@@ -510,35 +532,63 @@ function DetailStep({ hours, setHours, gradeTaken, setGradeTaken, year, setYear,
           </div>
         </Field>
 
-        <Field label="What grade were you in?">
-          <div className="flex flex-wrap gap-2">
-            {GRADE_LEVELS.map((g) => (
-              <button
-                key={g}
-                type="button"
-                onClick={() => setGradeTaken(gradeTaken === g ? null : g)}
-                className={`chip ${gradeTaken === g ? 'chip-on' : ''}`}
-              >
-                {g}th
-              </button>
-            ))}
-          </div>
-        </Field>
+        {hsYears.length > 0 ? (
+          <Field label="When did you take it?" hint={`set from your class of ${classYear}`}>
+            <div className="flex flex-wrap gap-2">
+              {hsYears.map((h) => {
+                const on = year === h.year && gradeTaken === h.grade
+                return (
+                  <button
+                    key={h.year}
+                    type="button"
+                    onClick={() => {
+                      tick()
+                      setYear(on ? null : h.year)
+                      setGradeTaken(on ? null : h.grade)
+                    }}
+                    aria-pressed={on}
+                    className={`chip ${on ? 'chip-on' : ''}`}
+                  >
+                    {ordinal(h.grade)} grade
+                    <span className="font-normal opacity-70">{h.year}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </Field>
+        ) : (
+          <>
+            <Field label="What grade were you in?">
+              <div className="flex flex-wrap gap-2">
+                {GRADE_LEVELS.map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => setGradeTaken(gradeTaken === g ? null : g)}
+                    className={`chip ${gradeTaken === g ? 'chip-on' : ''}`}
+                  >
+                    {g}th
+                  </button>
+                ))}
+              </div>
+            </Field>
 
-        <Field label="School year you took it">
-          <div className="flex flex-wrap gap-2">
-            {SCHOOL_YEARS.map((y) => (
-              <button
-                key={y}
-                type="button"
-                onClick={() => setYear(year === y ? null : y)}
-                className={`chip ${year === y ? 'chip-on' : ''}`}
-              >
-                {y}
-              </button>
-            ))}
-          </div>
-        </Field>
+            <Field label="School year you took it">
+              <div className="flex flex-wrap gap-2">
+                {SCHOOL_YEARS.map((y) => (
+                  <button
+                    key={y}
+                    type="button"
+                    onClick={() => setYear(year === y ? null : y)}
+                    className={`chip ${year === y ? 'chip-on' : ''}`}
+                  >
+                    {y}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          </>
+        )}
 
         <Field label="What was it like?" hint="pick any">
           <div className="flex flex-wrap gap-2">
@@ -750,10 +800,28 @@ const BURST = Array.from({ length: 12 }, (_, i) => {
   }
 })
 
-function Confirmation({ done, onOpenCourse, onAgain }) {
+function Confirmation({ done, onOpenCourse, onAgain, onSeeProgress }) {
   const crossed = done.count === MIN_REVIEWS
+  // A new stage gets its own moment, once the check has finished drawing.
+  const [stageOpen, setStageOpen] = useState(false)
+  useEffect(() => {
+    if (!done.stage) return undefined
+    const id = setTimeout(() => setStageOpen(true), 750)
+    return () => clearTimeout(id)
+  }, [done.stage])
+
   return (
     <div className="wrap flex min-h-[65vh] flex-col items-center justify-center py-14 text-center">
+      {stageOpen && (
+        <StageUpModal
+          stage={done.stage}
+          onClose={() => setStageOpen(false)}
+          onSeeProgress={onSeeProgress && (() => {
+            setStageOpen(false)
+            onSeeProgress()
+          })}
+        />
+      )}
       <div className="relative grid h-24 w-24 place-items-center">
         <span aria-hidden className="absolute inset-0 animate-ring rounded-full bg-good/30" />
         {crossed &&

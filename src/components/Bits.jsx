@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FACTOR_MAP, bandLabel, toneFor, verdictFor, MIN_REVIEWS, LEVEL_STYLE, deptHue, deptIcon, deptShort, NO_TONE } from '../lib/metrics'
+import { FACTOR_MAP, bandLabel, toneFor, verdictFor, MIN_REVIEWS, LEVEL_STYLE, deptHue, deptIcon, deptShort, NO_TONE, classYearOptions } from '../lib/metrics'
 
 /** Flips to true a frame after mount, so CSS transitions actually run. */
 export function useEntrance(delay = 0) {
@@ -121,6 +121,39 @@ const ICONS = {
       <circle cx="9" cy="8" r="2.7" />
       <circle cx="16.6" cy="9.4" r="2.1" />
       <path d="M3.8 19.2c.6-3.2 2.6-5.1 5.2-5.1s4.6 1.9 5.2 5.1M14.4 14.4c.6-.3 1.4-.5 2.2-.5 2 0 3.5 1.4 3.9 3.9" />
+    </>
+  ),
+  // Review stages
+  steps: (
+    <>
+      <path d="M8.2 3.8c1.5 0 2.3 1.7 2.3 3.8S9.6 11.5 8.3 11.5 5.9 10 5.9 7.8s.8-4 2.3-4z" />
+      <path d="M6.3 14.2l4-.5.3 2.4a2 2 0 0 1-4 .5z" />
+      <path d="M15.8 8.3c1.5 0 2.3 1.7 2.3 3.8S17.2 16 15.9 16s-2.4-1.5-2.4-3.7.8-4 2.3-4z" />
+      <path d="M13.8 18.7l4-.5.3 2.2a2 2 0 0 1-4 .5z" />
+    </>
+  ),
+  map: (
+    <>
+      <path d="M9 5.5L4 7.5v11l5-2 6 2 5-2v-11l-5 2z" />
+      <path d="M9 5.5v11M15 7.5v11" />
+    </>
+  ),
+  flag: (
+    <>
+      <path d="M6 20.5v-16" />
+      <path d="M6 5c3-1.6 5.5 1.4 8.5 0 1.6-.7 3-.8 4-.5v8.5c-1-.3-2.4-.2-4 .5-3 1.4-5.5-1.6-8.5 0" />
+    </>
+  ),
+  compass: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M15.6 8.4l-2.1 5.1-5.1 2.1 2.1-5.1z" />
+    </>
+  ),
+  mountain: (
+    <>
+      <path d="M2.8 19.5L9.4 8l3.7 6.2 2.4-3.4 5.7 8.7z" />
+      <path d="M7.4 11.5l2 1.4 1.9-1.3" />
     </>
   ),
 }
@@ -580,6 +613,68 @@ export function Empty({ title, body, action, icon = 'sparkle' }) {
       <h3 className="mt-4 text-[17px] font-bold text-ink">{title}</h3>
       {body && <p className="mx-auto mt-2 max-w-sm text-[14px] leading-relaxed text-muted">{body}</p>}
       {action && <div className="mt-5 flex justify-center">{action}</div>}
+    </div>
+  )
+}
+
+/** A review stage's badge: its icon on a disc of its colour. Stages not reached yet are quiet. */
+export function StageMedal({ stage, size = 48, locked = false, className = '', style }) {
+  return (
+    <span
+      aria-hidden
+      className={`relative grid shrink-0 place-items-center rounded-full ${locked ? 'bg-sunk text-muted' : 'text-white shadow-card'} ${className}`}
+      style={{
+        height: size,
+        width: size,
+        background: locked
+          ? undefined
+          : `radial-gradient(120% 120% at 30% 15%, color-mix(in oklab, ${stage.hue} 72%, white), ${stage.hue} 55%, color-mix(in oklab, ${stage.hue} 78%, black))`,
+        ...style,
+      }}
+    >
+      <Icon name={stage.icon} size={Math.round(size * 0.5)} stroke={locked ? 1.8 : 2.1} />
+    </span>
+  )
+}
+
+/** Pick the year you graduate, or graduated. A native select, so phones show their own wheel. */
+export function ClassYearSelect({ id, value, onChange }) {
+  const options = classYearOptions()
+  const groups = [
+    ['Middle school', options.filter((o) => o.grade < 9)],
+    ['High school', options.filter((o) => o.grade >= 9 && o.grade <= 12)],
+    ['Graduated', options.filter((o) => o.grade > 12)],
+  ]
+  return (
+    <div className="relative">
+      <select
+        id={id}
+        className={`field cursor-pointer appearance-none pr-11 ${value ? '' : 'text-muted'}`}
+        value={value ?? ''}
+        onChange={(e) => {
+          tick()
+          onChange(e.target.value ? Number(e.target.value) : null)
+        }}
+      >
+        <option value="" disabled>
+          Choose your class
+        </option>
+        {groups.map(([label, list]) => (
+          <optgroup key={label} label={label}>
+            {list.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label} · {o.note}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+      <Icon
+        name="chevron-down"
+        size={18}
+        stroke={2.2}
+        className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-muted"
+      />
     </div>
   )
 }

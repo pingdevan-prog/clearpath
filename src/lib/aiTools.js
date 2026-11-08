@@ -16,7 +16,7 @@ import { REQUIREMENTS, tallyCredits } from '../data/graduation'
 import { GOALS, INTERESTS, RIGOR } from '../data/pathways'
 import { buildPlan, rankCourses } from './advisor'
 import { baseNames, buildNameIndex, coursesNamedIn, creditsOf, warningsFor } from './plan'
-import { MIN_REVIEWS } from './metrics'
+import { MIN_REVIEWS, currentGrade, profileClassYear } from './metrics'
 import { PLAN_GRADES } from './store'
 
 const DEPTS = [
@@ -280,9 +280,11 @@ export function runTool(name, input, ctx) {
       }
       return {
         student: {
-          name: profile?.name || null,
+          // First name only: nothing more about the student needs to leave the browser.
+          name: profile?.name?.split(' ')[0] || null,
           role: profile?.role || null,
-          grade: profile?.grade || null,
+          class_year: profileClassYear(profile),
+          grade: currentGrade(profile),
         },
         plan: byYear,
         credits_planned: tally.total,

@@ -156,16 +156,84 @@ export function roleLabel(role) {
   return ROLE_MAP[role]?.label || null
 }
 
-/** How a profile reads under its name: "11th grade", "Educator", or nothing. */
+// ---------------------------------------------------------------------------
+// Class year. A student picks the year they graduate (or graduated), not a
+// grade, so the profile stays right every August without anyone editing it,
+// and middle schoolers and alumni can say where they are too.
+// ---------------------------------------------------------------------------
+
+/** The year the current school year ends. School years turn over in August. */
+export function schoolYearEnd(date = new Date()) {
+  return date.getMonth() >= 7 ? date.getFullYear() + 1 : date.getFullYear()
+}
+
+/** "2026–27" for the school year ending in 2027. */
+export function schoolYearLabel(end) {
+  return `${end - 1}–${String(end).slice(-2)}`
+}
+
+/** The grade a class is in during the school year ending `end`. Below 9 is middle school, above 12 is graduated. */
+export function gradeFor(classYear, end = schoolYearEnd()) {
+  return 12 - (classYear - end)
+}
+
+function nth(n) {
+  return n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`
+}
+
+/** Today's 6th graders down to students who finished twelve years ago. */
+export function classYearOptions(end = schoolYearEnd()) {
+  const out = []
+  for (let y = end + 6; y >= end - 12; y--) {
+    const g = gradeFor(y, end)
+    out.push({ value: y, grade: g, label: `Class of ${y}`, note: g > 12 ? 'Graduated' : `${nth(g)} grade now` })
+  }
+  return out
+}
+
+/** A profile's class year. Older profiles stored a grade, which is read as of when they saved it. */
+export function profileClassYear(profile) {
+  if (!profile) return null
+  if (profile.classYear) return profile.classYear
+  if (profile.grade) {
+    // Synced profiles carry a Firestore timestamp, local ones a plain number.
+    const t = profile.updatedAt?.toMillis?.() ?? profile.updatedAt ?? profile.createdAt
+    const saved = new Date(Number.isFinite(t) ? t : Date.now())
+    return schoolYearEnd(saved) + (12 - profile.grade)
+  }
+  return null
+}
+
+/** The grade a student is in right now, or null. Can be under 9 or over 12. */
+export function currentGrade(profile) {
+  const y = profileClassYear(profile)
+  return y ? gradeFor(y) : null
+}
+
+/** The four high school years of a class that have started by now, newest first, with the grade for each. */
+export function highSchoolYears(classYear, end = schoolYearEnd()) {
+  const out = []
+  for (let g = 12; g >= 9; g--) {
+    const yearEnd = classYear - (12 - g)
+    if (yearEnd <= end) out.push({ grade: g, year: schoolYearLabel(yearEnd) })
+  }
+  return out
+}
+
+/** How a profile reads under its name: "Class of 2028 · 11th grade", "Educator", or nothing. */
 export function profileSubtitle(profile) {
   if (!profile) return ''
-  if (profile.role === 'student' || (!profile.role && profile.grade)) {
-    return profile.grade ? `${profile.grade}th grade` : 'Student'
+  const classYear = profileClassYear(profile)
+  if (profile.role === 'student' || (!profile.role && classYear)) {
+    if (!classYear) return 'Student'
+    const g = gradeFor(classYear)
+    return `Class of ${classYear} · ${g > 12 ? 'Graduated' : `${nth(g)} grade`}`
   }
   return roleLabel(profile.role) || ''
 }
 
-export const SCHOOL_YEARS = ['2026–27', '2025–26', '2024–25', '2023–24', '2022–23']
+// The last five school years, newest first, for reviewers without a class year.
+export const SCHOOL_YEARS = Array.from({ length: 5 }, (_, i) => schoolYearLabel(schoolYearEnd() - i))
 
 // Averages stay hidden under this many reviews. Two opinions is not a pattern,
 // and a wrong average is worse than no average.

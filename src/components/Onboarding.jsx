@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AVATAR_COLORS } from '../data/schools'
-import { GRADE_LEVELS, ROLES, profileSubtitle } from '../lib/metrics'
-import { Avatar, Icon, Mark, SchoolTile, tick } from './Bits'
+import { ROLES, profileSubtitle } from '../lib/metrics'
+import { Avatar, ClassYearSelect, Icon, Mark, SchoolTile, tick } from './Bits'
 
 /**
  * First run: make a profile, then add your school. Two steps, nothing optional
@@ -112,18 +112,18 @@ function ProfileStep({ onDone, suggested }) {
   const [handle, setHandle] = useState('')
   const [handleEdited, setHandleEdited] = useState(false)
   const [role, setRole] = useState(null)
-  const [grade, setGrade] = useState(null)
+  const [classYear, setClassYear] = useState(null)
   const [color, setColor] = useState(AVATAR_COLORS[0])
 
   const effectiveHandle = handleEdited ? handle : handleFrom(name)
-  // A grade is only asked of, and only required of, students.
+  // A class year is only asked of, and only required of, students.
   const ready =
     name.trim().length >= 2 &&
     effectiveHandle.length >= 3 &&
     role &&
-    (role !== 'student' || grade)
+    (role !== 'student' || classYear)
 
-  const preview = { name: name.trim() || 'Your name', color, role, grade }
+  const preview = { name: name.trim() || 'Your name', color, role, classYear }
 
   return (
     <Shell>
@@ -141,10 +141,10 @@ function ProfileStep({ onDone, suggested }) {
             <Avatar profile={preview} size={58} className="transition-colors duration-300" />
             <div className="min-w-0">
               <div className="truncate text-[17px] font-bold text-ink">{preview.name}</div>
-              <div className="truncate text-[13.5px] text-muted">
-                @{effectiveHandle || 'username'}
-                {profileSubtitle(preview) ? ` · ${profileSubtitle(preview)}` : ''}
-              </div>
+              <div className="truncate text-[13.5px] text-muted">@{effectiveHandle || 'username'}</div>
+              {profileSubtitle(preview) && (
+                <div className="truncate text-[13.5px] text-muted">{profileSubtitle(preview)}</div>
+              )}
             </div>
           </div>
 
@@ -194,7 +194,7 @@ function ProfileStep({ onDone, suggested }) {
                     onClick={() => {
                       tick()
                       setRole(r.value)
-                      if (r.value !== 'student') setGrade(null)
+                      if (r.value !== 'student') setClassYear(null)
                     }}
                     aria-pressed={role === r.value}
                     className={`relative rounded-2xl border px-3.5 py-3 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 active:scale-[0.97] ${
@@ -217,22 +217,16 @@ function ProfileStep({ onDone, suggested }) {
 
             {role === 'student' && (
               <div className="animate-rise-in">
-                <div className="label">Grade</div>
-                <div className="mt-1.5 flex gap-2">
-                  {GRADE_LEVELS.map((g) => (
-                    <button
-                      key={g}
-                      type="button"
-                      onClick={() => {
-                        tick()
-                        setGrade(g)
-                      }}
-                      className={`chip flex-1 justify-center py-2 ${grade === g ? 'chip-on' : ''}`}
-                    >
-                      {g}th
-                    </button>
-                  ))}
+                <label className="label" htmlFor="cp-class">
+                  Class
+                </label>
+                <div className="mt-1.5">
+                  <ClassYearSelect id="cp-class" value={classYear} onChange={setClassYear} />
                 </div>
+                <p className="mt-1.5 text-[12.5px] leading-snug text-muted">
+                  The year you graduate, or graduated. Middle schoolers and alumni are welcome. Your grade
+                  moves up on its own each school year.
+                </p>
               </div>
             )}
             <div>
@@ -269,7 +263,8 @@ function ProfileStep({ onDone, suggested }) {
               name: name.trim(),
               handle: effectiveHandle,
               role,
-              grade: role === 'student' ? grade : null,
+              classYear: role === 'student' ? classYear : null,
+              grade: null,
               color,
             })
           }
