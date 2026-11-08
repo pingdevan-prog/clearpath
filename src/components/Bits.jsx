@@ -195,18 +195,23 @@ export function Logo({ size = 'md', className = '' }) {
   )
 }
 
-/** The mark: three choices, one clear line through them. */
+/** The mark: a waypoint with a check. Where you are headed, and that it is the right call. */
 export function Mark({ size = 34 }) {
   return (
     <span
       aria-hidden
-      className="grid shrink-0 place-items-center rounded-[11px] bg-brand shadow-glow"
-      style={{ height: size, width: size }}
+      className="grid shrink-0 place-items-center bg-brand text-brand shadow-glow"
+      style={{ height: size, width: size, borderRadius: size * 0.27 }}
     >
-      <svg viewBox="0 0 24 24" width={size * 0.62} height={size * 0.62} fill="none">
-        <path d="M4 19c3.6 0 4.2-6 7.6-6 3.4 0 4.1-6 8.4-6" stroke="white" strokeWidth="2.4" strokeLinecap="round" />
-        <circle cx="4" cy="19" r="2" fill="rgba(255,255,255,0.45)" />
-        <circle cx="20" cy="7" r="2.3" fill="white" />
+      <svg viewBox="0 0 96 96" width={size} height={size} fill="none">
+        <path d="M48 80C48 80 26 59 26 43a22 22 0 1 1 44 0c0 16-22 37-22 37z" fill="white" />
+        <path
+          d="M38.5 43.5l7 7L58 37.5"
+          stroke="currentColor"
+          strokeWidth="6.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
     </span>
   )
